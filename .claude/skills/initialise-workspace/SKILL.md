@@ -53,7 +53,7 @@ Create the docs repo from the orchestrator template:
 
 ```bash
 gh repo create [account]/[project]-docs \
-  --template andgasm/andgasm-claude-orchestration-project \
+  --template themachinagod/andgasm-claude-orchestration-project \
   --[visibility] \
   --clone
 ```
