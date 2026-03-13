@@ -3,6 +3,12 @@
 > Phase-by-phase design. Nailing each phase before moving on.
 > Currently focused on: **Setup + Phase 0 + Phase 1**
 > Goal: get these solid enough to test in Claude before proceeding.
+>
+> **Implementation status:**
+> - Setup (`/initialise-workspace`): BUILT
+> - Phase 0 (Discovery — manual): BUILT (user writes PRDs + `/submit-prds`)
+> - Phase 1 (Review Loop): BUILT (review team + stakeholder facilitator + ralph.sh)
+> - Phase 2+ (Decompose, Design, Implement, Verify, Deliver): DESIGN ONLY
 
 ---
 

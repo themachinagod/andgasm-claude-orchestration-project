@@ -42,7 +42,6 @@ claude
    - `.claude/` and `CLAUDE.md` moved to workspace root
    - All files configured with your project details
    - Labels synced to docs repo
-   - GitHub Project created
 
 ### After setup, your workspace looks like:
 
@@ -74,18 +73,105 @@ creative, iterative, take as long as you need.
 | Product vision, context, research, competitor notes | `[project]-docs/docs/discovery/` |
 | Detailed requirements (PRDs) | `[project]-docs/docs/prd/` |
 
-PRDs don't need to follow a rigid template. Write enough detail to
-describe what you're building, why, and for whom.
+PRDs don't need to follow a rigid template. A template is available at
+`docs/prd/templates/prd-template.md` for reference, but write enough
+detail to describe what you're building, why, and for whom.
+
+Discovery docs have a template too: `docs/discovery/templates/discovery-template.md`.
 
 ### When you're done
 
-Run `/submit-prds` to hand off to the pipeline. *(Not yet built.)*
+Run `/submit-prds` to hand off to the pipeline.
+
+---
+
+## Phase: Review
+
+After submitting PRDs, the review cycle begins. This is a loop between
+autonomous review and interactive stakeholder facilitation.
+
+### How it works
+
+```
+/submit-prds → Review Team (autonomous) → Stakeholder Facilitation (you) → Re-review → ... → Approved → Merge
+```
+
+### Step 1: Submit PRDs
+
+```
+/submit-prds
+```
+
+This creates:
+- A branch with your PRD and discovery files
+- A PR for the review team to work on
+- A GitHub Issue at `pipeline:review`
+
+### Step 2: Start autonomous review
+
+Run ralph.sh from the workspace root:
+
+```bash
+./scripts/ralph.sh
+```
+
+Or manually in Claude:
+
+```
+/orchestrate-review
+```
+
+The review team (product-manager + architect) will:
+- Read all your PRDs holistically
+- Fix obvious issues (formatting, consistency)
+- Leave PR comments for items needing your input
+- Update the issue with a summary
+
+### Step 3: Stakeholder facilitation
+
+Ralph stops when the review team needs your input. Start an interactive
+Claude session:
+
+```bash
+claude
+```
+
+The orchestrator detects the review state and invokes the stakeholder
+facilitator, which will:
+- Summarize what the reviewers found
+- Walk you through each item
+- Discuss trade-offs and options with you
+- Edit your PRDs based on your answers
+- Push everything to the PR
+
+You just answer questions. The facilitator handles all git mechanics.
+
+### Step 4: Re-review
+
+After facilitation, restart ralph:
+
+```bash
+./scripts/ralph.sh
+```
+
+The review team does a full re-review (not just checking prior items).
+If more items surface, the cycle repeats. When everything is clean,
+the PR is merged and the issue advances to `pipeline:decompose`.
+
+### Ralph options
+
+```bash
+./scripts/ralph.sh --max-cycles 5    # limit cycles
+./scripts/ralph.sh --dry-run          # preview without running
+./scripts/ralph.sh --pause 30         # 30s between cycles
+./scripts/ralph.sh --max-turns 50     # limit Claude turns per cycle
+./scripts/ralph.sh --timeout 300      # 5-minute timeout per cycle
+```
 
 ---
 
 ## Later phases (not yet built)
 
-- **Review** — autonomous review of PRDs, guided user facilitation
 - **Decompose** — PRDs → epics + roadmap
 - **Design** — per-epic architecture, UX, task breakdown
 - **Implement** — per-task coding

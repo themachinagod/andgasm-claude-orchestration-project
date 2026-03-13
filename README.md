@@ -39,7 +39,6 @@ Then run `/initialise-workspace`. The skill will:
 4. Move `.claude/` and `CLAUDE.md` to workspace root
 5. Configure all files with your project details
 6. Sync pipeline labels to the docs repo
-7. Create a GitHub Project for tracking
 
 ### What You Get
 
@@ -51,12 +50,12 @@ workspace/                       ← you started here
     ├── STATUS.md                ← project heartbeat
     ├── repos.yaml               ← repo registry
     ├── active-work/             ← session logs
+    ├── scripts/                 ← ralph.sh (autonomous loop)
     └── docs/
         ├── discovery/           ← vision, context, supporting materials
         ├── prd/                 ← product requirement documents
         ├── architecture/        ← system designs + ADRs (later)
         ├── design/              ← UX + impl design (later)
-        ├── planning/            ← roadmap + epic briefs (later)
         └── conventions/         ← commit + branching standards
 ```
 
@@ -68,32 +67,60 @@ product requirements and vision docs:
 - **PRDs** → `[project]-docs/docs/prd/`
 - **Vision, context, research** → `[project]-docs/docs/discovery/`
 
-Iterate as much as needed. There's no template to follow — write
-enough detail to describe what you're building and why.
+Templates are available in `docs/prd/templates/` and `docs/discovery/templates/`.
 
-### Step 4: Submit for Review (coming soon)
+### Step 4: Submit for Review
 
-When your PRDs are ready, `/submit-prds` will create a branch, PR,
-and issue — handing off to the autonomous pipeline. This skill is
-not yet built.
-
-## Pipeline Vision
+When your PRDs are ready:
 
 ```
-Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify → Deliver
+/submit-prds
 ```
 
-Currently implemented: **Setup (init) + Discovery (manual)**.
-Further phases are being designed and built incrementally.
+This creates a branch, PR, and issue — handing off to the autonomous
+review pipeline.
+
+### Step 5: Review Cycle
+
+Start the autonomous review loop:
+
+```bash
+cd [workspace-root]
+./[project]-docs/scripts/ralph.sh
+```
+
+Ralph runs the review team (product-manager + architect). When they need
+your input, Ralph stops. Start an interactive Claude session — the
+stakeholder facilitator walks you through the findings. Restart Ralph
+for re-review. Cycle continues until PRDs are approved.
+
+See `GUIDE.md` for detailed step-by-step instructions.
+
+## Pipeline
+
+```
+Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify → Deliver → Done
+```
+
+Currently implemented: **Setup + Discovery + Review**.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `CLAUDE.md` | Operating manual — workspace layout, rules, state architecture |
+| `CLAUDE.md` | Operating manual — workspace layout, pipeline, agents, state |
 | `STATUS.md` | Project heartbeat — current work, blockers, progress |
 | `repos.yaml` | Repository registry — topology and dependencies |
 | `GUIDE.md` | Step-by-step user guide |
+
+## Agents
+
+| Agent | Role |
+|-------|------|
+| `product-manager` | PRD completeness, cross-PRD consistency, scope discipline |
+| `architect` | Technical feasibility, NFR assessment, risk identification |
+| `frontend-architect` | Frontend feasibility, performance budgets, accessibility |
+| `stakeholder-facilitator` | Mediates review findings with user, edits docs, handles git |
 
 ## State Architecture
 
