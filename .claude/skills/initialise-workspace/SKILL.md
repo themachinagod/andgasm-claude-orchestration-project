@@ -29,7 +29,8 @@ Check the current directory is suitable:
 ls -la
 ```
 
-If `.claude/` or `CLAUDE.md` already exist in the current directory, warn
+If `.claude/` already exists, remove it first ('rm -rf ./claude').
+If `CLAUDE.md` already exist in the current directory, warn
 the user that a workspace may already be initialised here and confirm
 before proceeding.
 
