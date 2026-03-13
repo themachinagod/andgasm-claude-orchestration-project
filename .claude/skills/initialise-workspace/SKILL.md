@@ -66,8 +66,12 @@ Move Claude configuration from the docs repo to workspace root. These
 are static tooling files — they don't change during the project.
 
 ```bash
-# Move .claude/ directory (agents, skills, hooks, rules)
-mv ./[project]-docs/.claude ./.claude
+# Ensure .claude/ exists at workspace root (Claude Code may have already created it)
+mkdir -p ./.claude
+
+# Move contents from docs repo into workspace .claude/ (merge, don't nest)
+cp -a ./[project]-docs/.claude/. ./.claude/
+rm -rf ./[project]-docs/.claude
 
 # Move CLAUDE.md operating manual
 mv ./[project]-docs/CLAUDE.md ./CLAUDE.md
