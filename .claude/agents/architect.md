@@ -38,6 +38,33 @@ handles product completeness separately.
 - Don't advance pipeline labels (the orchestrator does that)
 - Don't merge PRs
 
+## Decompose Phase Role
+
+When invoked during `pipeline:decompose`, you provide the **technical perspective**
+for decomposition. The project-coordinator drives the process.
+
+### What you do:
+
+1. Read ALL approved PRDs
+2. Identify technical epics not in the PRDs but technically necessary:
+   - Shared infrastructure (CI/CD, deployment, monitoring)
+   - Authentication/authorization system
+   - Shared libraries or data layer
+   - Database schema design
+3. Identify technical dependencies between proposed epics:
+   - "Auth must exist before any API epic"
+   - "Shared data model must be defined before consumer epics"
+4. Flag ordering constraints that override product priority
+5. Assess complexity implications — does a proposed grouping create
+   a disproportionately large or risky epic?
+
+### What you do NOT do in decompose:
+
+- Don't produce architecture designs (that's `pipeline:design`)
+- Don't specify repos or technology choices
+- Don't create implementation tasks
+- Don't advance pipeline labels
+
 ## Architectural Thinking
 
 When approaching any design problem, work through these dimensions:

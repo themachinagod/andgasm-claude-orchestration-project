@@ -8,7 +8,8 @@
 > - Setup (`/initialise-workspace`): BUILT
 > - Phase 0 (Discovery — manual): BUILT (user writes PRDs + `/submit-prds`)
 > - Phase 1 (Review Loop): BUILT (review team + stakeholder facilitator + ralph.sh)
-> - Phase 2+ (Decompose, Design, Implement, Verify, Deliver): DESIGN ONLY
+> - Phase 2 (Decompose): BUILT (coordinator + PM + architect team, unified orchestrator)
+> - Phase 3+ (Design, Implement, Verify, Deliver): DESIGN ONLY
 
 ---
 
@@ -25,7 +26,7 @@ flowchart LR
     VER --> DEL["Deliver"]
 ```
 
-**Currently designing:** Setup → Discovery → Review.
+**Currently designing:** Setup → Discovery → Review → Decompose.
 
 ---
 
@@ -184,19 +185,18 @@ The user runs it once to submit their initial PRDs. It handles all the
 git/GitHub mechanics.
 
 ```mermaid
-flowchart TD
+flowchart LR
     USER["User runs /submit-prds"]
-    CHECK["Check: are there new/modified files in<br/>docs/prd/ and docs/discovery/?"]
-    BRANCH["Create branch: docs/prd-submission-NNN"]
-    STAGE["Stage all PRD + discovery files"]
-    COMMIT["Commit: 'docs: submit PRDs for review'"]
+    CHECK["Check for new/modified files<br/>in docs/prd/ and docs/discovery/"]
+    BRANCH["Create branch:<br/>docs/prd-submission-NNN"]
+    COMMIT["Stage + commit<br/>PRD and discovery files"]
     PUSH["Push branch"]
-    PR["Create PR with structured description:<br/>— lists all PRDs submitted<br/>— links to discovery docs<br/>— ready for review"]
-    ISSUE["Create GitHub Issue:<br/>— title: 'PRD Review: [project name]'<br/>— label: pipeline:review<br/>— body: links to PR + file list"]
-    STATUS["Update STATUS.md:<br/>'PRDs submitted for review'"]
-    DONE["Done — orchestrator takes over from here"]
+    PR["Create PR<br/>with structured description"]
+    ISSUE["Create GitHub Issue<br/>pipeline:review"]
+    STATUS["Update STATUS.md"]
+    DONE["Done — orchestrator<br/>takes over from here"]
 
-    USER --> CHECK --> BRANCH --> STAGE --> COMMIT --> PUSH --> PR --> ISSUE --> STATUS --> DONE
+    USER --> CHECK --> BRANCH --> COMMIT --> PUSH --> PR --> ISSUE --> STATUS --> DONE
 ```
 
 **Re-runnable:** If the user adds more PRDs later (e.g., after review
@@ -265,19 +265,19 @@ the issue comments to understand the sub-state:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> needs_review : /submit-prds creates issue
+    [*] --> needs_review : submit-prds creates issue
 
     state "Needs review" as needs_review
     state "Needs stakeholder input" as needs_input
     state "Input provided, needs re-review" as needs_rereview
+    state "Done — pipeline decompose" as done
 
-    needs_review --> needs_input : Review team: "N items need input"
-    needs_review --> done : Review team: "approved" (clean first time)
-    needs_input --> needs_rereview : Facilitator: "input provided"
-    needs_rereview --> needs_input : Review team: "N more items"
-    needs_rereview --> done : Review team: "approved"
+    needs_review --> needs_input : Review team finds N items needing input
+    needs_review --> done : Review team approves — clean first time
+    needs_input --> needs_rereview : Facilitator provides input
+    needs_rereview --> needs_input : Review team finds more items
+    needs_rereview --> done : Review team approves
 
-    state "pipeline:decompose" as done
     done --> [*]
 ```
 
@@ -431,10 +431,136 @@ sequenceDiagram
 > Rough notes. Each phase gets detailed treatment when we get to it.
 
 ### Phase 2: Decompose
-- Agent reads reviewed PRDs → produces epics + roadmap
-- Creates epic issues at `pipeline:design`
-- Initiatives = grouping labels
-- PR + review gate
+
+After review completes, the approved PRDs need to be grouped into epics
+and sequenced into a product roadmap. This is product-level planning —
+not implementation-level task breakdown (that happens during Design).
+
+#### Inputs
+
+- Approved PRDs in `docs/prd/` (merged from review phase)
+- Discovery docs in `docs/discovery/`
+- Issue at `pipeline:decompose` (created when review merges)
+
+#### Decomposition Team
+
+| Agent | Role | What they contribute |
+|-------|------|---------------------|
+| project-coordinator (primary) | Drives the process | Invokes PM + architect, synthesizes roadmap, manages sign-off |
+| product-manager | Product grouping | Which PRDs form natural epics, initiative themes, priority ordering |
+| architect | Technical analysis | Technical epics (infra, auth, shared libs), dependency constraints |
+
+The coordinator is the primary agent — it invokes PM and architect as
+sub-agents, synthesizes their perspectives into a roadmap, and manages
+the sign-off cycle.
+
+#### The Flow
+
+```mermaid
+flowchart LR
+    DETECT["Orchestrator detects<br/>pipeline:decompose"]
+    COORD["Coordinator invokes<br/>PM + Architect"]
+    SYNTH["Coordinator synthesizes<br/>roadmap document"]
+    PR["Branch + PR<br/>with roadmap"]
+    SIGNOFF{"PM<br/>sign-off?"}
+    MERGE["Merge PR"]
+    EPICS["Create epic issues<br/>at pipeline:design"]
+    REVISE["Coordinator<br/>revises"]
+    ESCALATE["Escalate to<br/>stakeholder"]
+
+    DETECT --> COORD --> SYNTH --> PR --> SIGNOFF
+    SIGNOFF -->|"approved"| MERGE --> EPICS
+    SIGNOFF -->|"concerns"| REVISE --> SIGNOFF
+    SIGNOFF -->|"3+ cycles"| ESCALATE
+```
+
+#### Sub-State Machine
+
+The issue stays at `pipeline:decompose` throughout. Sub-state tracked
+via issue comments:
+
+```mermaid
+stateDiagram-v2
+    [*] --> NeedsDecomposition : Issue created
+    NeedsDecomposition --> ProposalReady : Coordinator produces roadmap
+    ProposalReady --> Approved : PM approves
+    ProposalReady --> NeedsRevision : PM flags concerns
+    NeedsRevision --> ProposalReady : Coordinator revises
+    NeedsRevision --> NeedsStakeholder : 3+ revision cycles
+    NeedsStakeholder --> ProposalReady : Stakeholder resolves
+    Approved --> [*] : Merge and create epics
+```
+
+| Orchestrator reads | Sub-state | Action |
+|---|---|---|
+| No agent comments | Needs decomposition | Dispatch coordinator |
+| "decomposition proposed, awaiting sign-off" | Proposal ready | Coordinator handles PM sign-off internally |
+| "sign-off: approved" | Approved | Merge PR, create epic issues |
+| "sign-off: concerns" | Needs revision | Coordinator revises |
+| "escalated to stakeholder" | Needs stakeholder | Ralph stops / user engages |
+
+#### PM Sign-Off
+
+The product-manager reviews the complete roadmap and either approves or
+flags concerns. This is an internal team cycle — mostly autonomous. The
+PM checks:
+- Product groupings cover all PRDs (no orphans)
+- Priority ordering reflects value delivery
+- Initiative labels are meaningful
+- Groupings are right-sized (not too large, not too small)
+
+#### Circuit Breaker
+
+After 3 internal revision cycles (PM flags concerns, coordinator revises,
+PM still has concerns), the coordinator escalates to the stakeholder:
+- Adds `needs-stakeholder-input` label
+- Writes a clear summary of unresolved concerns
+- Ralph stops; user starts interactive Claude session to resolve
+
+#### Initiatives
+
+Initiative labels are thematic groupings applied to epic issues for
+context (e.g., `initiative:auth`, `initiative:reporting`). Created
+dynamically by the coordinator during decomposition, not pre-defined.
+They group related epics across the roadmap.
+
+#### What the Roadmap Contains
+
+Template at `docs/planning/templates/roadmap-template.md`:
+- **Initiatives** — thematic labels and descriptions
+- **Product epics** — grouped from PRDs, with source PRD refs, scope,
+  acceptance criteria, dependencies
+- **Technical epics** — identified by architect (not from PRDs)
+- **Dependency order** — sequenced levels noting what blocks what
+- **Cross-cutting concerns** — things spanning multiple epics
+
+#### Epic Issue Creation
+
+On approval, the orchestrator creates epic issues using the epic issue
+template. Each epic gets:
+- `type:epic` + `pipeline:design` + `initiative:[tag]` labels
+- Structured body: overview, source PRDs, scope, acceptance criteria,
+  dependencies
+- The decompose issue itself is closed with `pipeline:done`
+
+#### Outputs
+
+| Output | Location |
+|--------|----------|
+| Product roadmap | `docs/planning/roadmap.md` (merged PR) |
+| Epic issues | Docs repo GitHub Issues at `pipeline:design` |
+| Initiative labels | Applied to epic issues |
+| STATUS.md update | Current state reflects decomposition results |
+
+#### Ralph Integration
+
+Ralph runs the decomposition autonomously. The PM sign-off happens
+within the same Ralph session (no user involvement in the normal case).
+Only the circuit breaker (3+ revision cycles) causes Ralph to stop.
+
+This is different from the review phase where Ralph always stops for
+stakeholder facilitation. Decomposition is mostly autonomous — the team
+works, PM signs off, and epic issues are created without user intervention.
 
 ### Phase 3: Design (per epic)
 - Orchestrator assesses epic → assembles team → sub-agents produce design
@@ -486,6 +612,14 @@ sequenceDiagram
 | Init asks enriching questions (description, audience, constraints) | Seeds every file with useful context from day one |
 | "Facilitator" not "Interviewer" for PRD review engagement | Facilitator mediates, synthesizes, acts — different from light setup Q&A |
 | Different user engagement types get different names | Setup ≠ Facilitation ≠ Escalation — avoids ambiguity as pipeline grows |
+| Decompose team = coordinator + PM + architect | Product grouping needs product perspective, technical epics need architect, coordinator synthesizes |
+| PM signs off on decomposition (not stakeholder) | Decomposition is a product-level planning activity; PM is the authority unless major concerns |
+| Circuit breaker at 3 revision cycles | Same pattern as review loop guard — prevents infinite internal disagreement loops |
+| Coordinator is primary agent for decompose | Coordinator drives the process, invokes PM and architect as sub-agents, owns the roadmap |
+| Technical epics identified during decompose | Architect identifies infrastructure/auth/shared-lib epics not in PRDs — these are real work that needs planning |
+| Initiative labels are dynamic | Created by coordinator during decomposition, not pre-defined — keeps things flexible |
+| Unified orchestrator handles multiple stages | Single `/orchestrate` skill reads pipeline label and dispatches to correct logic; ralph.sh stays simple |
+| Decompose is mostly autonomous (no stakeholder unless circuit breaker) | Different from review where stakeholder always engages; PM can sign off without user involvement |
 
 ---
 

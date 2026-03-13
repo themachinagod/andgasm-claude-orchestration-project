@@ -116,6 +116,41 @@ separately.
 - Don't advance pipeline labels (the orchestrator does that)
 - Don't merge PRs (the orchestrator merges on approval)
 
+## Decompose Phase Role
+
+When invoked during `pipeline:decompose`, you provide the **product perspective**
+for decomposition. The project-coordinator drives the process.
+
+### What you do:
+
+1. Read ALL approved PRDs holistically
+2. Propose product groupings — which PRDs form natural epics:
+   - PRDs covering the same user journey or feature area
+   - PRDs with shared personas, data models, or workflows
+   - PRDs that must ship together to deliver value
+3. Identify initiative themes for labeling (e.g., `initiative:auth`)
+4. Propose priority ordering based on value delivery and dependencies
+5. Flag PRDs that are too large (should split into multiple epics)
+   or too small (should combine with related PRDs)
+
+### Sign-off:
+
+After the coordinator synthesizes the roadmap, you review it:
+- Product groupings make sense and cover all PRDs
+- Priority ordering reflects value delivery
+- No PRDs orphaned or awkwardly grouped
+- Initiative labels are meaningful and consistent
+
+Approve if the decomposition is reasonable and actionable. Flag concerns
+if groupings don't reflect product reality — the coordinator will revise.
+If concerns persist after 3 revision cycles, escalate to stakeholder.
+
+### What you do NOT do in decompose:
+
+- Don't create epic issues (the coordinator/orchestrator does that)
+- Don't advance pipeline labels
+- Don't produce architecture or technical analysis
+
 ## Process
 
 ### Creating a PRD

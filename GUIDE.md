@@ -118,7 +118,7 @@ Run ralph.sh from the workspace root:
 Or manually in Claude:
 
 ```
-/orchestrate-review
+/orchestrate
 ```
 
 The review team (product-manager + architect) will:
@@ -170,9 +170,74 @@ the PR is merged and the issue advances to `pipeline:decompose`.
 
 ---
 
+## Phase: Decompose
+
+After review completes (PRDs approved and merged), the decompose phase
+groups your PRDs into epics and produces a product roadmap. This is
+mostly autonomous — the team works without you unless it hits a snag.
+
+### How it works
+
+```
+Review approved → Decompose team (PM + architect + coordinator) → Roadmap → PM sign-off → Epic issues created
+```
+
+### Step 1: Automatic pickup
+
+Ralph picks this up automatically after the review phase merges. The
+orchestrator detects the issue at `pipeline:decompose` and dispatches
+the decomposition team.
+
+Or manually in Claude:
+
+```
+/orchestrate
+```
+
+### Step 2: Team produces roadmap
+
+The decomposition team works autonomously:
+
+- **Product-manager** analyses PRDs and proposes groupings — which PRDs
+  form natural epics, what initiative themes emerge, what priority ordering
+- **Architect** identifies technical epics (infra, shared libs, auth) not
+  in the PRDs, and flags dependency constraints between epics
+- **Coordinator** synthesizes both perspectives into a roadmap document,
+  creates a branch and PR
+
+### Step 3: PM sign-off
+
+The product-manager reviews the completed roadmap. In most cases, this
+happens autonomously (no user involvement). If the PM has concerns, the
+coordinator revises and re-requests sign-off.
+
+If the team can't converge after 3 revision cycles, it escalates to you.
+Ralph stops. Start an interactive Claude session:
+
+```bash
+claude
+```
+
+The orchestrator will present the unresolved concerns. Discuss, decide,
+and the coordinator will revise the roadmap based on your input.
+
+### Step 4: Epic issues created
+
+Once approved, the roadmap PR is merged and epic issues are created in
+the docs repo at `pipeline:design`. Each epic references its source PRDs,
+has dependency information, and carries an initiative label for grouping.
+
+### What you get
+
+- **Roadmap document** in `docs/planning/roadmap.md`
+- **Epic issues** in the docs repo, each at `pipeline:design`
+- **Initiative labels** on epic issues (e.g., `initiative:auth`)
+- **Dependency ordering** — which epics block which
+
+---
+
 ## Later phases (not yet built)
 
-- **Decompose** — PRDs → epics + roadmap
 - **Design** — per-epic architecture, UX, task breakdown
 - **Implement** — per-task coding
 - **Verify** — code review, testing, security, spec compliance

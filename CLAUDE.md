@@ -17,6 +17,7 @@ workspace/
 │   └── docs/
 │       ├── discovery/    ← vision, context, supporting materials
 │       ├── prd/          ← product requirement documents
+│       ├── planning/     ← roadmap + epic decomposition
 │       ├── architecture/ ← system designs + ADRs (later)
 │       ├── design/       ← UX + implementation design (later)
 │       └── conventions/  ← commit + branching standards
@@ -55,12 +56,20 @@ Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify 
 |-------|-------|-------|-------------|
 | Discovery | (manual) | User | Write PRDs and vision docs in IDE |
 | Review | `pipeline:review` | Review Team + Stakeholder Facilitator | PRD analysis + stakeholder facilitation cycle |
-| Decompose | `pipeline:decompose` | project-coordinator | PRDs → epics + roadmap |
+| Decompose | `pipeline:decompose` | project-coordinator + product-manager + architect | PRDs → epics + roadmap |
 | Design | `pipeline:design` | architect + frontend-architect + ux-architect | Architecture, UX, task breakdown |
 | Implement | `pipeline:implement` | engineer-[stack] | Per-task coding |
 | Verify | `pipeline:verify` | code-reviewer + test-engineer + security-reviewer + spec-compliance | Review pipeline |
 | Deliver | `pipeline:deliver` | e2e-test-engineer + tech-writer + release-manager | E2E, docs, release |
 | Done | `pipeline:done` | — | Completed |
+
+### Pipeline Teams
+
+| Stage | Team | Primary | Sign-off | Escalation |
+|-------|------|---------|----------|------------|
+| Review | product-manager + architect | orchestrator | stakeholder (via facilitator) | Always — facilitation loop |
+| Decompose | product-manager + architect + coordinator | coordinator | product-manager | Stakeholder if 3+ revision cycles |
+| Design | (TBD) | (TBD) | (TBD) | (TBD) |
 
 ### Review Phase (Detail)
 
@@ -89,11 +98,47 @@ stakeholder input is needed, Ralph stops. The user starts an interactive
 Claude session where the facilitator engages. After facilitation, the
 user restarts Ralph for re-review.
 
+### Decompose Phase (Detail)
+
+The decompose phase turns approved PRDs into an actionable product roadmap
+of epics. The `pipeline:decompose` label stays throughout. Sub-state is
+tracked via issue comments.
+
+**Team:**
+- `project-coordinator` (primary) — drives the process, invokes PM and
+  architect, synthesizes roadmap, manages sign-off cycle
+- `product-manager` — product groupings, initiative themes, priority
+  ordering, sign-off authority
+- `architect` — technical epics, dependency constraints, ordering
+
+**Sub-states:**
+
+| Sub-state | Signal | Next action |
+|-----------|--------|-------------|
+| Needs decomposition | No agent comments on issue | Coordinator decomposes |
+| Proposal ready | Coordinator: "decomposition proposed, awaiting sign-off" | PM reviews |
+| Approved | PM: "sign-off: approved" | Merge PR, create epic issues |
+| Needs revision | PM: "sign-off: concerns" | Coordinator revises |
+| Escalated | Coordinator: "escalated to stakeholder" (3+ cycles) | User engages |
+
+**Circuit breaker:** After 3 internal revision cycles without PM approval,
+the coordinator adds `needs-stakeholder-input` and writes a summary of
+unresolved concerns. Ralph stops and the user resolves directly.
+
+**Outputs:**
+- Roadmap document in `[DOCS_REPO]/docs/planning/roadmap.md`
+- Epic issues in docs repo at `pipeline:design`
+- Initiative labels applied to epic issues (e.g., `initiative:auth`)
+
+**Ralph integration:** Ralph runs the coordinator autonomously. The PM
+sign-off happens within the same session (autonomous, no user needed).
+Only if the circuit breaker triggers does Ralph stop for stakeholder input.
+
 ## Available Skills
 
 ### Pipeline
 - `/submit-prds` — bridge from manual discovery to pipeline (branch, PR, issue)
-- `/orchestrate-review` — focused review-phase orchestrator (reads state, dispatches agents)
+- `/orchestrate` — pipeline orchestrator (reads state, dispatches agent teams for review + decompose stages)
 
 ### Utility
 - `/orient` — situational report (project state, issues, PRs, recommendations)
@@ -107,9 +152,13 @@ user restarts Ralph for re-review.
 - `frontend-architect` — frontend feasibility (when PRD has UI components)
 - `stakeholder-facilitator` — mediates between review findings and user
 
+### Decompose Phase
+- `project-coordinator` — drives decomposition, synthesizes PM + architect input into roadmap
+- `product-manager` — product groupings, initiative themes, sign-off authority
+- `architect` — technical epics, dependency identification, ordering constraints
+
 ### Later Phases (not yet ported)
 - `ux-architect` — user flows, interaction design, accessibility
-- `project-coordinator` — epic decomposition, task creation
 - `engineer-*` — stack-specific implementation
 - `code-reviewer`, `security-reviewer`, `test-engineer`, `spec-compliance` — verify
 - `e2e-test-engineer`, `release-manager`, `tech-writer` — deliver
@@ -160,21 +209,21 @@ Operational state only: STATUS.md updates, session log entries.
 ## Autonomous Operation (Ralph)
 
 Ralph (`scripts/ralph.sh`) runs Claude sessions in a loop. Each session:
-1. Runs `/orchestrate-review`
-2. Completes one unit of work
+1. Runs `/orchestrate`
+2. Completes one unit of work (review, decompose, or whatever stage is active)
 3. Updates all state
 4. Exits
 
 Ralph stops when:
 - `needs-stakeholder-input` label detected (user must engage)
-- All review issues are done
+- All pipeline issues are done
 - 3 consecutive failures
 
 After Ralph stops for stakeholder input:
 1. User starts interactive Claude session
-2. Orchestrator detects state, invokes stakeholder-facilitator
-3. Facilitator walks through findings with user
-4. After facilitation, user restarts Ralph
+2. Orchestrator detects state and engages user (facilitator for review,
+   direct discussion for decompose concerns)
+3. After resolution, user restarts Ralph
 
 ## If You Don't Know What To Do
 

@@ -6,8 +6,8 @@
 # picks the highest-priority action, executes it, updates state, and exits.
 # The next session reads state from files and GitHub and continues.
 #
-# Currently focused on the review phase — runs /orchestrate-review.
-# Will be extended for later pipeline phases.
+# Handles all implemented pipeline stages (review, decompose).
+# Runs /orchestrate which dispatches to the correct stage logic.
 #
 # Usage:
 #   ./ralph.sh                    # run from workspace root
@@ -192,19 +192,19 @@ print(count)
 PROMPT='You are in an AUTONOMOUS session (Ralph). The user is NOT present.
 Read CLAUDE.md for operating instructions.
 
-Run /orchestrate-review to:
+Run /orchestrate to:
 1. Orient: read STATUS.md, repos.yaml, GitHub Issues and PRs
-2. Determine the review sub-state for any pipeline:review issues
-3. Execute the appropriate action (invoke review team, merge approved PRs, etc.)
+2. Determine the pipeline stage and sub-state for open issues
+3. Execute the appropriate action (dispatch agent teams for review, decompose, etc.)
 4. Update all state (STATUS.md, issue labels, issue comments)
 5. Stop after completing one action cycle
 
 If stakeholder input is needed:
 - Add the needs-stakeholder-input label to the issue
 - Update STATUS.md
-- Stop immediately — do NOT attempt to facilitate without a user
+- Stop immediately — do NOT attempt to engage the user
 
-If nothing is actionable (no pipeline:review issues, or all waiting on stakeholder):
+If nothing is actionable (no open pipeline issues, or all waiting on stakeholder):
 - Update STATUS.md with current state
 - Stop
 
@@ -217,7 +217,7 @@ run_cycle() {
 
     if $DRY_RUN; then
         log "[dry-run] Would run claude in $WORKSPACE_ROOT"
-        log "[dry-run] Prompt: (orchestrate-review single cycle)"
+        log "[dry-run] Prompt: (orchestrate single cycle)"
         return 0
     fi
 
@@ -256,7 +256,7 @@ run_cycle() {
 
 # --- Main ---
 
-log "Starting Ralph loop (review phase)"
+log "Starting Ralph loop"
 log "Workspace:    $WORKSPACE_ROOT"
 log "Max cycles:   $([ $MAX_CYCLES -eq 0 ] && echo 'unlimited' || echo $MAX_CYCLES)"
 log "Max turns:    $([ $MAX_TURNS -eq 0 ] && echo 'unlimited' || echo $MAX_TURNS) per cycle"

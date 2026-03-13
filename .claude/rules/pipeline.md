@@ -61,6 +61,44 @@ The facilitator mediates between review findings and the user:
 5. Update issue: "stakeholder input provided, ready for re-review"
 6. Remove `needs-stakeholder-input` label
 
+## Decompose Phase Sub-States
+
+The decompose phase uses a single `pipeline:decompose` label throughout.
+Sub-state is tracked via issue comments. The `needs-stakeholder-input`
+label is only added when the team cannot converge (circuit breaker).
+
+### Decompose Team
+
+| Agent | Role | What they do |
+|-------|------|-------------|
+| project-coordinator (primary) | Drives the process | Invokes PM and architect, synthesizes roadmap, creates PR, manages sign-off cycle |
+| product-manager | Product grouping | Proposes which PRDs form epics, initiative themes, priority ordering |
+| architect | Technical analysis | Identifies technical epics, dependency constraints, ordering |
+
+### Sub-State Machine
+
+| Sub-state | Detected by | Next action |
+|-----------|------------|-------------|
+| Issue created (no agent comments) | No decompose comment from agents | Coordinator decomposes |
+| "decomposition proposed, awaiting sign-off" | Latest coordinator comment | PM reviews the roadmap |
+| "sign-off: approved" | Latest PM comment | Merge PR, create epic issues at `pipeline:design` |
+| "sign-off: concerns — [details]" | Latest PM comment | Coordinator revises |
+| "revision N — [what changed]" | Latest coordinator comment | PM re-reviews |
+| "escalated to stakeholder" | Coordinator comment (3+ revision cycles) | If interactive: engage user. If Ralph: stop |
+| "stakeholder input provided" | User/facilitator comment | Coordinator revises |
+
+### PM Sign-Off
+
+The product-manager reviews the completed roadmap and either approves or
+flags concerns. This is an internal team cycle — the stakeholder is NOT
+involved unless the circuit breaker triggers.
+
+### Circuit Breaker
+
+If the coordinator and PM cycle through 3+ revisions without converging,
+the coordinator adds `needs-stakeholder-input` and writes a summary of
+what the team cannot resolve. Ralph stops and the user engages directly.
+
 ## Forward Transitions
 
 ### review → decompose
@@ -69,9 +107,11 @@ The facilitator mediates between review findings and the user:
 - PR merged to main
 
 ### decompose → design
-- Epics created with task breakdown
-- Epic files in `active-work/`
-- Component repo issues created
+- Roadmap document produced and merged (`docs/planning/`)
+- Epic issues created in docs repo at `pipeline:design`
+- Each epic references its source PRDs
+- Dependencies between epics documented
+- Initiative labels applied
 
 ### design → implement
 - Architecture and/or UX design docs exist

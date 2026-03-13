@@ -167,7 +167,7 @@ PRDs submitted: [list]
 
 What happens next:
 1. Run ralph.sh to start the autonomous review cycle
-   — OR start Claude and run /orchestrate-review
+   — OR start Claude and run /orchestrate
 2. The review team (product-manager + architect) will analyse your PRDs
 3. If they find items needing your input, ralph will stop
 4. Start an interactive Claude session — the stakeholder facilitator
