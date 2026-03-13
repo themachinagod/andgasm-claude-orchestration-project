@@ -1,0 +1,24 @@
+# Project Repository Registry
+#
+# Machine-readable registry of all repositories in this project.
+# Agents use this to understand repository topology, navigate between repos,
+# and determine dependency ordering for cross-repo changes.
+#
+# The docs repo entry is populated by /initialise-workspace.
+# Component repos are added by /repo-provision after architecture design.
+
+project:
+  name: "[PROJECT_NAME]"
+  account: "[GITHUB_ACCOUNT]"
+  description: "[PROJECT_DESCRIPTION]"
+
+repos:
+  # Docs repo (self-referencing — populated by /initialise-workspace)
+  # - name: "[project]-docs"
+  #   type: docs
+  #   github: "[account]/[project]-docs"
+  #   path: ./[project]-docs
+  #   purpose: "Project documentation, coordination, and pipeline state"
+
+  # Component repos are added here by /repo-provision
+  # after architecture design identifies what's needed.
