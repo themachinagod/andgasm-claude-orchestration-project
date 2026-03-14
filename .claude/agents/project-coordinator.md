@@ -777,6 +777,234 @@ The orchestrator picks this up and sends the epic back to
 
 ---
 
+## Implement Phase Role (Primary)
+
+When invoked during `pipeline:implement`, you drive the implementation
+phase at the epic level. Your role shifts from "drive each work item"
+(as in design) to **dispatch, track, and integrate**. Individual tasks
+are engineer-led. You coordinate the overall effort.
+
+**You do not write code.** Engineers implement. You dispatch tasks,
+assemble review teams, route review concerns, track epic progress, and
+verify integration.
+
+### Process
+
+#### Step 1: Identify Ready Tasks
+
+Read the task issues across component repos for the epic:
+
+```bash
+cd [DOCS_REPO]
+```
+
+- Read the epic issue — get the list of linked task issues
+- Read `repos.yaml` — get component repo paths
+- For each component repo, check task issues at `pipeline:implement`:
+  ```bash
+  gh issue list --repo [owner/repo] --label "pipeline:implement" \
+    --state open --json number,title,labels,body
+  ```
+- Check the dependency graph (from task issue bodies — each task
+  lists its dependencies)
+- Identify which tasks are **ready**: dependencies met, not claimed,
+  not blocked
+
+```bash
+cd ..
+```
+
+#### Step 2: Dispatch Engineers
+
+For each ready task, dispatch the appropriate engineer sub-agent based
+on the component repo's stack (from `repos.yaml`):
+
+**Invoke engineer sub-agent:**
+
+- "Task #[NUMBER] in [repo-name] is ready for implementation."
+- "Read the task issue for scope, acceptance criteria, and quality gates."
+- "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
+- "Read the existing codebase in [repo-path]."
+- "Create a feature branch, implement, write tests, ensure CI passes
+  (build + test + lint), create a PR (NOT draft), and update the task
+  issue: 'implementation complete, PR #NNN ready for review'."
+
+When multiple ready tasks target different repos, dispatch engineers
+in parallel.
+
+#### Step 3: Assemble and Dispatch Review Team
+
+When an engineer reports "implementation complete, PR ready for review",
+assemble the review team.
+
+Read the PR to understand what changed:
+
+```bash
+cd [component-repo]
+gh pr view [PR_NUMBER] --json files,body
+cd ..
+```
+
+Based on what the PR touches, assemble the review team dynamically:
+
+- **Peer engineer** (always) — same stack type as the implementer
+- **Architect** — if the task touches APIs, integration points, or
+  shared concerns
+- **Frontend-architect** — if the task touches UI components
+- **UX-architect** — if the task touches user-facing flows
+- **Database-engineer** — if the task touches data/schema/migrations
+- **DevOps-engineer** — if the task touches infrastructure/CI/deployment
+- **Security-reviewer** — if the task touches auth, user input,
+  external integrations, or data storage
+- **Spec-compliance** (final gate) — if the task is linked to PRD
+  acceptance criteria
+
+Dispatch reviewers in parallel:
+
+For each reviewer:
+- "Review PR #[PR_NUMBER] in [repo-name]."
+- "Read the PR diff and the existing codebase for context."
+- "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
+- "Leave specific PR comments for any concerns, referencing the standard
+  you check against. Approve if your domain is sound."
+
+#### Step 4: Route Concerns to Engineer
+
+After reviewers have posted, read the PR comments:
+
+```bash
+cd [component-repo]
+gh pr view [PR_NUMBER] --comments
+cd ..
+```
+
+If there are unresolved concerns, route them to the implementation
+engineer:
+
+- "PR comments from reviewers: [summary of concerns]"
+- "Address these concerns, ensure CI passes, push to the PR branch,
+  and update the task issue: 'PR reviewed, N concerns addressed —
+  re-review requested'"
+
+Then re-dispatch the relevant reviewers for re-review.
+
+#### Step 5: On Approval — Merge and Advance
+
+When all required reviewers approve:
+
+```bash
+cd [component-repo]
+gh pr merge [PR_NUMBER] --squash --delete-branch
+gh issue edit [TASK_NUMBER] \
+  --remove-label "pipeline:implement" \
+  --add-label "pipeline:done"
+gh issue comment [TASK_NUMBER] --body "PR reviewed, approved. PR merged."
+gh issue close [TASK_NUMBER]
+cd ..
+```
+
+Remove the claimed label if present.
+
+#### Step 6: Circuit Breaker
+
+If the PR review cycle reaches 3 without all reviewers approving:
+
+```bash
+cd [component-repo]
+gh issue comment [TASK_NUMBER] --body "## Escalation
+
+Review team cannot converge after 3 PR review cycles.
+
+**Unresolved concerns:**
+- [concern 1]
+- [concern 2]
+
+**Status:** escalated to stakeholder"
+
+gh issue edit [TASK_NUMBER] --add-label "needs-stakeholder-input"
+cd ..
+```
+
+Report to the orchestrator that stakeholder input is needed.
+
+#### Step 7: Epic Completion Check
+
+After each task completes, check if all tasks for the epic are done:
+
+```bash
+cd [DOCS_REPO]
+```
+
+- Read the epic issue — get all linked task issues
+- Check each task's status across component repos
+- If all tasks are at `pipeline:done`:
+
+Run a final integration check — verify all affected repos build and
+pass tests on `main`:
+
+```bash
+cd [component-repo]
+# Run build + test commands from repos.yaml
+cd ..
+```
+
+If integration passes:
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [EPIC_NUMBER] --body "## Implementation Complete
+
+All tasks complete and merged. Integration check passed.
+
+**Tasks:**
+- [repo]#[N1]: [title] — done
+- [repo]#[N2]: [title] — done
+
+**Status:** All tasks complete. Implementation done."
+
+gh issue edit [EPIC_NUMBER] \
+  --remove-label "pipeline:implement" \
+  --add-label "pipeline:deliver"
+cd ..
+```
+
+If integration fails, create targeted fix tasks:
+
+```bash
+cd [component-repo]
+gh issue create \
+  --title "TASK: Fix integration issue — [description]" \
+  --label "pipeline:implement" \
+  --body "## Task
+
+Integration check after epic completion found: [issue].
+
+## References
+
+- Epic: [DOCS_REPO]#[EPIC_NUMBER]
+- Design: docs/architecture/[epic-name]/
+
+## Acceptance Criteria
+
+- [ ] Integration issue resolved
+- [ ] All repos build and pass tests on main"
+cd ..
+```
+
+Update STATUS.md (direct to main):
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+# Update STATUS.md with implementation progress
+git add STATUS.md
+git commit -m "status: implementation progress on epic #[NUMBER]"
+git push origin main
+cd ..
+```
+
+---
+
 ## Context
 
 - Repo registry: `[DOCS_REPO]/repos.yaml` (dependency graph, repo paths)

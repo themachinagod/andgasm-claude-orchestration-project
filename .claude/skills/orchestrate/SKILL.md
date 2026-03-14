@@ -88,7 +88,8 @@ Determine which pipeline stage to handle based on priority:
 1. `pipeline:review` — review and facilitation cycle
 2. `pipeline:decompose` — PRDs → epics + roadmap
 3. `pipeline:design` — epic-level design + task decomposition
-4. Any other `pipeline:*` — report "not yet implemented" and stop
+4. `pipeline:implement` — per-task coding + specialist PR review
+5. Any other `pipeline:*` — report "not yet implemented" and stop
 
 If multiple issues exist, handle the highest-priority one. Priority
 follows the orchestration priority in `.claude/rules/pipeline.md`.
@@ -96,6 +97,7 @@ follows the orchestration priority in `.claude/rules/pipeline.md`.
 Skip rules:
 - `blocked` label → skip until blocker resolved
 - `needs-stakeholder-input` → if interactive: can handle. If Ralph: stop.
+- `claimed:*` label → skip, another session is working on this task
 
 ### Phase 3: Execute
 
@@ -596,6 +598,170 @@ cd ..
 The `pipeline:review` issue now exists. Continue to Phase 2 (Decide)
 and handle it as a normal review — do NOT stop and require another
 orchestrate cycle.
+
+---
+
+#### Stage: `pipeline:implement`
+
+Implementation tasks live in **component repos** (not the docs repo).
+The orchestrator reads task issues across all component repos listed in
+`repos.yaml`. Each task follows the same sub-state machine as other
+phases — production step (engineer codes) + review cycle (specialist
+team reviews PR).
+
+**Discovering tasks:** During Orient, read task issues across component
+repos:
+
+```bash
+cd [DOCS_REPO]
+```
+
+Read `repos.yaml` to get the list of component repos. For each component
+repo:
+
+```bash
+gh issue list --repo [owner/repo] --label "pipeline:implement" \
+  --state open --json number,title,labels,body
+```
+
+```bash
+cd ..
+```
+
+Read the latest comment on each task issue to determine sub-state.
+
+| What you see | Sub-state | Next action |
+|-------------|-----------|-------------|
+| No agent comments, unclaimed | **Ready** | Dispatch coordinator to assess + dispatch engineer |
+| "claimed by [session]" or `claimed:*` label | **In progress** | Skip — engineer is working |
+| "implementation complete, PR ready for review" | **PR ready** | Dispatch coordinator to assemble + dispatch review team |
+| "PR under review" | **Under review** | Skip — reviewers working |
+| "PR reviewed, N concerns raised" | **Needs changes** | Dispatch coordinator to route concerns to engineer |
+| "PR reviewed, N concerns addressed — re-review requested" | **Re-review needed** | Dispatch coordinator to re-dispatch review team |
+| "PR reviewed, approved" | **Approved** | Merge PR, advance task to `pipeline:done` |
+| "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
+| "blocked: amendment #NNN" | **Blocked** | Skip until amendment resolved |
+| `needs-stakeholder-input` label | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
+
+##### Sub-state: Ready (task unclaimed, no comments)
+
+Check the task's dependencies (listed in the task issue body). If
+dependencies are not met (referenced tasks not at `pipeline:done`),
+skip this task.
+
+If dependencies are met, dispatch the `project-coordinator`:
+
+- "Task #[NUMBER] in [repo-name] is at pipeline:implement and ready."
+- "Read the task issue for scope, acceptance criteria, and quality gates."
+- "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
+- "Read `repos.yaml` for the component repo's stack."
+- "Dispatch the appropriate engineer sub-agent for the repo's stack."
+- "The engineer should: read the codebase, create a feature branch,
+  implement, write tests, ensure CI passes (build + test + lint),
+  create a PR (NOT draft), and update the task issue with
+  'implementation complete, PR #NNN ready for review'."
+
+##### Sub-state: PR Ready (implementation complete)
+
+The engineer has created a PR and CI is green. Dispatch the
+`project-coordinator` to assemble the review team:
+
+- "Task #[NUMBER] in [repo-name] has a PR ready for review."
+- "Read the PR to understand what changed."
+- "Assemble the review team dynamically based on what the PR touches:"
+- "  - Peer engineer (always) — same stack as implementer"
+- "  - Architect — if PR touches APIs, integration, shared concerns"
+- "  - Frontend-architect — if PR touches UI components"
+- "  - UX-architect — if PR touches user-facing flows"
+- "  - Database-engineer — if PR touches data/schema/migrations"
+- "  - DevOps-engineer — if PR touches infrastructure/CI/deployment"
+- "  - Security-reviewer — if PR touches auth, user input, external integrations"
+- "  - Spec-compliance (final gate) — if task is PRD-linked"
+- "Dispatch reviewers to leave PR comments. When all approve, merge
+  the PR and advance the task to pipeline:done."
+
+##### Sub-state: Needs Changes (concerns raised)
+
+The coordinator routes review concerns to the implementation engineer:
+
+- "PR #[NUMBER] in [repo-name] has reviewer concerns."
+- "Route the concerns to the implementation engineer."
+- "The engineer addresses concerns, ensures CI passes, pushes to the
+  PR branch, and updates the task issue: 'PR reviewed, N concerns
+  addressed — re-review requested'."
+
+##### Sub-state: Re-review Needed
+
+Re-dispatch the coordinator to re-dispatch the review team (or the
+subset whose concerns were addressed).
+
+##### Sub-state: Approved (all reviewers approve)
+
+Merge the PR and advance the task:
+
+```bash
+cd [component-repo]
+gh pr merge [PR_NUMBER] --squash --delete-branch
+gh issue edit [TASK_NUMBER] \
+  --remove-label "pipeline:implement" \
+  --add-label "pipeline:done"
+gh issue comment [TASK_NUMBER] --body "PR reviewed, approved. PR merged."
+gh issue close [TASK_NUMBER]
+cd ..
+```
+
+Remove any `claimed:*` label.
+
+After merging, check if all tasks for the parent epic are now done:
+
+```bash
+cd [DOCS_REPO]
+```
+
+Read the epic issue — check all linked task issues across component repos.
+If all tasks are at `pipeline:done`:
+
+- Run a final integration check (build + test in all affected repos)
+- Update the epic issue: "All tasks complete. Implementation done."
+- Advance the epic: remove `pipeline:implement`, add `pipeline:deliver`
+
+```bash
+cd ..
+```
+
+If not all tasks are done, just update STATUS.md with progress.
+
+##### Sub-state: Needs Stakeholder Input
+
+Same pattern as all other phases:
+
+**If interactive:** engage the user directly. Read the escalation summary
+from the task issue comments, discuss the unresolved concerns, and once
+the user provides direction, update the issue comment and remove the
+`needs-stakeholder-input` label. Then dispatch the coordinator to route
+direction to the engineer.
+
+**If autonomous (Ralph):** stop gracefully. Ensure the label is present,
+update STATUS.md, report.
+
+##### Sub-state: Blocked
+
+The task is blocked by an amendment issue in the docs repo. Skip until
+the amendment is resolved (amendment issue closed, `blocked` label
+removed from the task).
+
+##### Multiple Tasks
+
+When multiple tasks are ready, handle them based on priority:
+
+1. Tasks whose dependencies just completed (unblocked work)
+2. Tasks with review concerns needing routing (keep PRs moving)
+3. Tasks with approved PRs needing merge
+4. New tasks ready for implementation
+
+In concurrent mode (multiple terminals), each session claims one task
+at a time. In sequential mode (single Ralph), handle the highest-priority
+task per cycle.
 
 ---
 

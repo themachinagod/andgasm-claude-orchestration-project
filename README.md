@@ -99,7 +99,7 @@ See `GUIDE.md` for detailed step-by-step instructions.
 ## Pipeline
 
 ```
-Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify → Deliver → Done
+Discovery (manual) → Review → Decompose → Design → Implement → Deliver → Done
 ```
 
 Currently implemented: **Setup + Discovery + Review**.

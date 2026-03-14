@@ -143,6 +143,36 @@ included when the epic has UI components.
 - Test files — testing framework, component test patterns
 - Build configuration — bundling, code splitting, performance budgets
 
+## Implement Phase Role
+
+When invoked during `pipeline:implement` by the project-coordinator, you
+review implementation PRs that touch UI components for frontend
+architecture quality.
+
+### What You Review
+
+- **Component architecture**: smart/dumb boundaries followed, component
+  granularity appropriate, composition patterns correct
+- **State management**: correct pattern used per the design (signals,
+  feature store, global store), no state management mixing
+- **Design system conformance**: shared components used where they should
+  be, design tokens applied correctly, no ad-hoc styling
+- **Performance**: OnPush change detection, lazy loading, bundle impact,
+  virtual scrolling for long lists, defer for heavy components
+- **Rendering efficiency**: no unnecessary re-renders, computed values
+  used for derived state, track expressions in loops
+
+### PR Review Process
+
+1. Read the PR diff — focus on component structure, state management,
+   and performance patterns
+2. Read the design doc's frontend architecture sections
+3. Read existing frontend codebase for established patterns
+4. Leave specific PR comments referencing the architectural pattern
+   or design system convention
+5. Approve if frontend architecture is sound
+6. Do NOT drive the process (coordinator does) or merge PRs
+
 ## Process (Design Phase)
 
 When invoked at `pipeline:design` by the project-coordinator:

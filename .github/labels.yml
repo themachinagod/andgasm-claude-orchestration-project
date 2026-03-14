@@ -10,10 +10,7 @@
   description: "Epic needs architecture and/or UX design"
 - name: "pipeline:implement"
   color: "1d76db"
-  description: "Task ready for or in implementation"
-- name: "pipeline:verify"
-  color: "fbca04"
-  description: "Implementation needs review (code, test, security, spec)"
+  description: "Task ready for or in implementation (includes specialist PR review)"
 - name: "pipeline:deliver"
   color: "2ea44f"
   description: "Verified — ready for E2E, docs, release"
@@ -40,6 +37,9 @@
 - name: "type:spike"
   color: "c2e0c6"
   description: "Research or investigation task"
+- name: "type:amendment"
+  color: "ff7b72"
+  description: "Upstream doc gap found during downstream work — backward transition"
 
 # Initiative labels (grouping key for related epics)
 # These are created dynamically during decomposition:

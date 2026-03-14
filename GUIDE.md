@@ -238,11 +238,114 @@ has dependency information, and carries an initiative label for grouping.
 
 ---
 
+## Phase: Implement
+
+After design completes, task issues exist in component repos at
+`pipeline:implement`. Each task has scope, acceptance criteria, quality
+gates, and references to the design doc and epic.
+
+Implementation follows the same pattern as every other phase: a
+production step (engineer writes code) + a review cycle (specialist
+team reviews the PR via PR comments). There is no separate "verify"
+phase — review is built in.
+
+### How it works
+
+```
+Design creates tasks → Engineer implements → PR created (CI green) → Review team reviews PR → Approved → Merge
+```
+
+### Step 1: Identify ready tasks
+
+The orchestrator (or you, manually) reads task issues across component
+repos and checks the dependency graph. Tasks are ready when their
+dependencies are complete and they're not claimed by another session.
+
+```bash
+# Check tasks across component repos
+cd [component-repo]
+gh issue list --label "pipeline:implement" --state open
+cd ..
+```
+
+### Step 2: Run implementation sessions
+
+Open one or more Claude terminal sessions. Each session picks up a
+task:
+
+```bash
+claude
+```
+
+Then either run `/orchestrate` or directly instruct Claude to implement
+a specific task. The session:
+
+1. Claims the task (adds `claimed:[session-id]` label)
+2. Engineer reads the design doc, PRDs, and existing codebase
+3. Engineer creates a feature branch, implements, writes tests
+4. Engineer ensures CI passes locally (build + test + lint)
+5. Engineer creates a PR (NOT draft) and updates the task issue
+
+### Step 3: Review cycle
+
+The coordinator assembles a review team based on what the PR touches:
+
+- **Peer engineer** — always (code quality, stack patterns)
+- **Architect** — for API/integration/shared concerns
+- **Frontend-architect** — for UI components
+- **UX-architect** — for user-facing flows
+- **Database-engineer** — for data/schema changes
+- **DevOps-engineer** — for infrastructure/CI changes
+- **Security-reviewer** — for auth, user input, external integrations
+- **Spec-compliance** — final gate for PRD-linked tasks
+
+Reviewers leave PR comments. The engineer addresses concerns. Re-review
+until all approve or the circuit breaker triggers (3 cycles).
+
+### Step 4: Merge and advance
+
+On approval, the coordinator merges the PR and advances the task to
+`pipeline:done`. When all tasks for an epic are done, the coordinator
+runs a final integration check and advances the epic to `pipeline:deliver`.
+
+### Running concurrent sessions
+
+You can run multiple implementation sessions in parallel:
+
+- Open multiple terminals, each running `claude`
+- Each session claims a different task via `claimed:` labels
+- Tasks in different repos have zero conflict risk
+- Tasks in the same repo should touch different modules (design phase
+  task boundaries ensure this)
+- Engineers rebase onto `main` frequently during same-repo concurrent work
+
+### When things go wrong
+
+**CI fails:** Engineer fixes before creating PR. Review team does not
+engage until CI is green.
+
+**Design gap found:** Engineer creates an amendment issue in the docs
+repo, adds `blocked` label to the task, moves to other unblocked tasks.
+
+**Review impasse (3+ cycles):** Circuit breaker triggers,
+`needs-stakeholder-input` label added. Start an interactive Claude
+session to resolve.
+
+### Ralph support
+
+Ralph can also run implementation with stage filtering:
+
+```bash
+./scripts/ralph.sh --stage implement
+```
+
+This handles one task per cycle — sequential, not concurrent. For
+concurrent implementation, use multiple terminals instead.
+
+---
+
 ## Later phases (not yet built)
 
-- **Design** — per-epic architecture, UX, task breakdown
-- **Implement** — per-task coding
-- **Verify** — code review, testing, security, spec compliance
-- **Deliver** — E2E, docs, release
+- **Deliver** — E2E testing, documentation, release coordination
 
-Each phase will be added to this guide as it's designed and tested.
+This phase will be added to this guide as it's designed and tested.

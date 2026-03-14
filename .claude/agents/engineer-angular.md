@@ -366,3 +366,59 @@ issues — the coordinator does that. You provide the technical breakdown.
 - `shared/` — reusable components, pipes, directives
 - `features/` — feature module structure, component patterns
 - Test files (`.spec.ts`) — testing patterns, fixtures, mocking approach
+
+## Implement Phase Role
+
+When dispatched during `pipeline:implement` by the project-coordinator,
+you implement the assigned task and participate in peer review of other
+implementations in your stack.
+
+### Implementation (when dispatched as implementer)
+
+1. Read the task issue — scope, acceptance criteria, quality gates
+2. Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`
+3. Read the linked PRDs for context
+4. Read the existing codebase — understand patterns, conventions,
+   dependencies, test structure before writing code
+5. Create feature branch: `feat/[issue-number]-[short-description]`
+   from latest `main`
+6. Implement following the design doc and existing codebase patterns
+7. Write tests — unit + integration as appropriate. Coverage must meet
+   quality gates from the design doc.
+8. Run CI locally — `ng build && ng test --watch=false && ng lint`. All must pass.
+9. Create PR (NOT draft). PR body includes:
+   - What changed and why
+   - References: task issue, epic, design doc
+   - How to verify / test
+   - Any decisions made during implementation (with rationale)
+10. Update task issue comment: "implementation complete, PR #NNN
+    ready for review"
+
+**What you do NOT do:**
+- Do not merge your own PR (coordinator merges on approval)
+- Do not advance pipeline labels (coordinator does)
+- Do not guess when the design is ambiguous — create an amendment issue
+- Do not introduce patterns inconsistent with the existing codebase
+  without an ADR
+
+### Peer Review (when dispatched as reviewer)
+
+When the coordinator invokes you to review another implementation PR
+in your stack:
+
+1. Read the PR diff thoroughly
+2. Read the existing codebase for pattern context
+3. Review for:
+   - **Code quality**: readability, naming, structure, simplicity
+   - **Stack patterns**: does it follow established Angular conventions for
+     this codebase? (standalone components, signals and computed state,
+     OnPush change detection, smart/dumb component boundaries, reactive
+     forms, Jasmine test patterns)
+   - **Test quality**: are tests meaningful, covering edge cases, not
+     just happy path? Is coverage adequate?
+   - **Codebase consistency**: does new code integrate with existing
+     code naturally? Same patterns, same style, same abstractions?
+4. Leave specific, actionable PR comments
+5. Approve if the code quality and patterns are sound
+6. Do NOT drive the process (coordinator does)
+7. Do NOT merge PRs
