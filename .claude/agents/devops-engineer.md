@@ -238,7 +238,14 @@ touch infrastructure concerns.
 7. Ensure CI passes — build, lint, validate configs
 8. Create PR (NOT draft). Reference task issue, epic, design doc.
 9. Update task issue: `**Status:** implementation complete, PR #NNN ready for review`
-10. Update STATUS.md In Flight status to 'PR created, ready for review'
+10. **Update STATUS.md** — update the In Flight row for this task:
+    change Status to `PR created (#N)`. Direct to main:
+    ```bash
+    cd [DOCS_REPO] && git checkout main && git pull origin main
+    # Edit the In Flight row for this task
+    git add STATUS.md && git commit -m "status: PR created for #[TASK]"
+    git push origin main && cd ..
+    ```
 
 **What you do NOT do:**
 - Do not merge your own PR

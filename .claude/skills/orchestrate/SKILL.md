@@ -257,9 +257,13 @@ gh issue comment [NUMBER] --body "PRDs approved and merged. Issue advanced to pi
 **Status:** approved, PR merged, advanced to decompose"
 ```
 
-Update STATUS.md: move review issue from In Flight to Recently Completed. Update Phase in Project Overview if applicable.
+Update STATUS.md (direct to main):
+- Move the review issue row from Active Work/In Flight to Recently Completed
+- Update Phase in Project Overview to "Decompose"
 
 ```bash
+git checkout main && git pull origin main
+# Edit STATUS.md sections
 git add STATUS.md
 git commit -m "status: PRDs approved, advancing to decompose — #[NUMBER]"
 git push origin main
@@ -345,7 +349,13 @@ Roadmap merged: docs/planning/roadmap.md
 gh issue close [NUMBER]
 ```
 
-Update STATUS.md: move decompose issue to Recently Completed. Add epic issues to In Flight (type: design, status: Ready). Update Phase to 'Design'.
+Update STATUS.md (direct to main):
+- Move decompose issue to Recently Completed
+- Add each epic issue to Active Work / In Flight:
+  ```
+  | #[N] | EPIC: [title] | design | [level] | Ready |
+  ```
+- Update Phase in Project Overview to "Design"
 
 ```bash
 git checkout main && git pull origin main
@@ -487,7 +497,12 @@ When "tasks created" is detected, advance the epic. The epic issue
 stays open as a tracking umbrella — individual task issues drive
 implementation.
 
-Update STATUS.md: move epic design to Recently Completed. Add tasks to In Flight (type: implement, status: Ready). Update Phase to 'Implement' if applicable.
+Update STATUS.md (direct to main):
+- Move epic design row to Recently Completed
+- Update the epic's Active Work row stage to "implement"
+- Update Phase in Project Overview to "Implement" if all epics are
+  past design
+- Add a Watch Item if design outputs affect other in-flight work
 
 ##### Sub-state: Needs Stakeholder Input
 
@@ -690,10 +705,48 @@ Check the task's dependencies (listed in the task issue body). If
 dependencies are not met (referenced tasks not at `pipeline:done`),
 skip this task.
 
-If dependencies are met, dispatch the `project-coordinator` for this
-specific task. One coordinator invocation drives one task through the
-full implementation and review cycle (same pattern as design phase:
-one coordinator per epic).
+If dependencies are met, **claim the task atomically before dispatching
+the coordinator.** This prevents concurrent sessions from picking up
+the same task.
+
+**Claiming protocol (orchestrator does this, not coordinator):**
+
+```bash
+# 1. Apply claimed label FIRST — this is the atomic lock
+gh issue edit [TASK_NUMBER] --repo [owner/repo] \
+  --add-label "claimed:[SESSION_ID]"
+
+# 2. Post claim comment on the issue
+gh issue comment [TASK_NUMBER] --repo [owner/repo] \
+  --body "Claimed by session [SESSION_ID].
+
+**Status:** claimed by [SESSION_ID]"
+```
+
+```bash
+# 3. Update STATUS.md — Active Sessions + In Flight
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+```
+
+Add to Active Sessions:
+```
+| [SESSION_ID] | #[NUMBER] [short-title] | [timestamp UTC] | Implementing |
+```
+
+Add to In Flight:
+```
+| #[NUMBER] | [repo] | [title] | In progress | [SESSION_ID] |
+```
+
+```bash
+git add STATUS.md
+git commit -m "status: claimed #[NUMBER] for implementation"
+git push origin main
+cd ..
+```
+
+**Only after claiming succeeds**, dispatch the `project-coordinator`:
 
 - "Task #[NUMBER] in [repo-name] is at pipeline:implement and ready."
 - "Read the task issue for scope, acceptance criteria, and quality gates."
@@ -775,7 +828,27 @@ cd ..
 
 Remove any `claimed:*` label.
 
-Update STATUS.md: move task from In Flight to Recently Completed with notes about what merged.
+Update STATUS.md (direct to main):
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+```
+
+- Remove the task row from In Flight
+- Add to Recently Completed:
+  ```
+  | #[NUMBER] | [title] | [date] | [repo]#[PR_NUMBER] |
+  ```
+- Remove the session row from Active Sessions
+- Update any Watch Items if this task affects downstream work
+
+```bash
+git add STATUS.md
+git commit -m "status: task #[NUMBER] complete — PR merged"
+git push origin main
+cd ..
+```
 
 After merging, check if all tasks for the parent epic are now done:
 
@@ -829,7 +902,11 @@ gh issue comment [TASK_NUMBER] --repo [owner/repo] --body "Amendment #[AMENDMENT
 **Status:** unblocked, ready for implementation"
 ```
 
-Then dispatch the coordinator for this task as per the Ready sub-state.
+Update STATUS.md: move the task row from Blocked back to In Flight
+(status: `In progress`).
+
+Then dispatch the coordinator for this task as per the Ready sub-state
+(claiming protocol applies — the task needs to be re-claimed).
 
 If the amendment is still `"OPEN"`, skip this task until the next
 orchestration cycle.
@@ -849,9 +926,16 @@ coordinator invocation drives its task through the full implementation
 and review cycle. Do not batch multiple tasks into a single coordinator
 dispatch.
 
-In concurrent mode (multiple terminals), each session claims one task
-at a time via `claimed:*` labels. In sequential mode (single Ralph),
-handle the highest-priority task per cycle.
+**Concurrency safety:** In concurrent mode (multiple terminals), each
+session claims one task at a time via the claiming protocol above
+(`claimed:[SESSION_ID]` label + STATUS.md Active Sessions). During
+Orient, if a task has a `claimed:*` label, skip it — another session
+owns it. If a task has a `claimed:*` label but no matching Active
+Sessions row and the label is >4 hours old, treat as stale: remove
+the label and the row, then claim normally.
+
+In sequential mode (single Ralph), handle the highest-priority task
+per cycle.
 
 ---
 
@@ -869,8 +953,78 @@ For any other `pipeline:*` stage:
 
 After execution:
 
-1. Update STATUS.md sections as appropriate for the action taken (see pipeline.md State Update Protocol for section-specific guidance)
+1. Update STATUS.md sections as appropriate for the action taken (see STATUS.md Section Format below)
 2. Ensure all commits are pushed
+
+---
+
+### STATUS.md Section Format
+
+STATUS.md contains these operational sections. Agents update the
+**specific section** for the event — not the whole file. All STATUS.md
+updates go direct to main:
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+# Update specific STATUS.md sections
+git add STATUS.md
+git commit -m "status: [action summary]"
+git push origin main
+cd ..
+```
+
+#### Active Sessions
+
+Tracks which sessions are currently working. Used to detect stale
+claims and prevent concurrent work collisions.
+
+```markdown
+## Active Sessions
+
+| Session | Task | Started | Notes |
+|---------|------|---------|-------|
+| ralph-001 | #95 observability | 2026-03-14 21:00 UTC | Implementing |
+```
+
+- Add row when session starts working on a task
+- Remove row when session completes or exits
+- If a row is older than 4 hours with no matching `claimed:*` label
+  on the issue, treat it as stale — remove the row and unclaim the task
+
+#### In Flight
+
+Tracks tasks currently being worked on and their progress.
+
+```markdown
+## In Flight
+
+| Issue | Repo | Title | Status | Owner |
+|-------|------|-------|--------|-------|
+| #95 | api | Observability | In progress | ralph-001 |
+| #91 | api | Schema migration | PR created (#3) | ralph-002 |
+```
+
+Status values: `In progress`, `PR created (#N)`, `Under review`,
+`Addressing N concerns`, `Re-review requested`
+
+- Add row when task is claimed
+- Update status as task progresses through sub-states
+- Move to Recently Completed when PR is merged
+- Move to Blocked if amendment issue created
+
+#### Blocked
+
+```markdown
+## Blocked
+
+| Issue | Repo | Title | Blocked By | Notes |
+|-------|------|-------|------------|-------|
+| #92 | api | ORM models | docs#102 (amendment) | Design gap in schema |
+```
+
+- Move here from In Flight when blocked
+- Move back to In Flight when blocker resolves
 
 ### Detecting Interactive vs. Autonomous
 

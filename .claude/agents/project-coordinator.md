@@ -829,8 +829,6 @@ The orchestrator picks this up and sends the epic back to
 
 ## Implement Phase Role (Primary)
 
-When dispatched for a task, register in STATUS.md Active Sessions before starting work. Deregister when the task cycle completes.
-
 When invoked during `pipeline:implement`, you drive a **single task**
 through the full implementation cycle. The orchestrator dispatches you
 once per task — same pattern as design phase (once per epic). You read
@@ -840,6 +838,53 @@ and merge on approval.
 **You do not write code.** Engineers implement. You select the right
 engineer, assemble review teams, route review concerns, and manage
 the PR lifecycle for the task you are given.
+
+### STATUS.md Update Protocol
+
+The orchestrator claims the task (label + Active Sessions + In Flight)
+before dispatching you. You are responsible for updating STATUS.md
+as the task progresses through sub-states. All updates go direct to
+main:
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+# Update the specific section
+git add STATUS.md
+git commit -m "status: [action summary]"
+git push origin main
+cd ..
+```
+
+**Update In Flight status** at each transition:
+
+| Event | In Flight Status | Commit message |
+|-------|-----------------|----------------|
+| Engineer creates PR | `PR created (#N)` | `status: PR created for #[TASK]` |
+| Review team dispatched | `Under review` | `status: #[TASK] under review` |
+| Concerns raised | `Addressing N concerns` | `status: #[TASK] addressing review concerns` |
+| Concerns addressed | `Re-review requested` | `status: #[TASK] re-review requested` |
+
+The In Flight table format:
+```markdown
+| Issue | Repo | Title | Status | Owner |
+|-------|------|-------|--------|-------|
+```
+
+On task completion (PR merged), the **orchestrator** handles the final
+STATUS.md update (moving from In Flight to Recently Completed and
+cleaning up Active Sessions). You report completion back to the
+orchestrator.
+
+**Watch Items:** If you discover something other agents should know
+(design change, dependency met, constraint discovered), add a Watch
+Item to STATUS.md:
+```markdown
+## Watch Items
+
+| Item | Added | Relevant Until | Notes |
+|------|-------|----------------|-------|
+```
 
 ### Process
 
@@ -883,8 +928,6 @@ Dynamically select the engineer sub-agent. Read the repo's technology
 indicators (from manifest files and `repos.yaml`) and match against
 available engineer agent descriptions. Do not use a static lookup
 table — assess the repo and select the best-fit engineer.
-
-Update STATUS.md In Flight: add the task (status: 'In progress', owner: session ID).
 
 **Invoke the selected engineer sub-agent:**
 
@@ -961,6 +1004,8 @@ PR: #[PR_NUMBER]
 cd ..
 ```
 
+Update STATUS.md In Flight: change this task's status to `Under review`.
+
 #### Step 4: Route Concerns to Engineer
 
 After reviewers have posted, read the PR comments:
@@ -971,7 +1016,8 @@ gh pr view [PR_NUMBER] --comments
 cd ..
 ```
 
-If there are unresolved concerns, route them to the implementation
+If there are unresolved concerns, update STATUS.md In Flight status
+to `Addressing N concerns`, then route them to the implementation
 engineer:
 
 - "PR comments from reviewers: [summary of concerns]"
@@ -988,7 +1034,8 @@ gh pr checks [PR_NUMBER] --required --fail
 cd ..
 ```
 
-Then re-dispatch the relevant reviewers for re-review.
+Update STATUS.md In Flight status to `Re-review requested`, then
+re-dispatch the relevant reviewers for re-review.
 
 #### Step 5: On Approval — Merge and Advance
 
@@ -1013,7 +1060,13 @@ cd ..
 
 Remove the claimed label if present.
 
-Update STATUS.md: move task from In Flight to Recently Completed. Include notes about what was merged.
+Update STATUS.md (direct to main):
+- Move the task from In Flight to Recently Completed:
+  ```
+  | #[NUMBER] | [title] | [date] | [repo]#[PR_NUMBER] |
+  ```
+- Remove the Active Sessions row for this session (if task cycle is complete)
+- Add Watch Items if this completion unblocks downstream work
 
 #### Step 6: Circuit Breaker
 
@@ -1045,8 +1098,10 @@ adds the `blocked` label to the task:
 1. **Acknowledge the block** — read the amendment issue to understand
    the gap. Verify the amendment has correct labels
    (`type:amendment,pipeline:[target-stage],blocker`).
-2. **Update STATUS.md** — move the task from In Flight to Blocked
-   with the amendment issue cross-reference.
+2. **Update STATUS.md** — move the task row from In Flight to Blocked:
+   ```
+   | #[TASK] | [repo] | [title] | docs#[AMENDMENT] (amendment) | [description of gap] |
+   ```
 3. **Move to other work** — dispatch engineers for other ready tasks.
    Do not wait for the amendment to resolve.
 4. **Monitor resolution** — when the orchestrator detects the blocking
