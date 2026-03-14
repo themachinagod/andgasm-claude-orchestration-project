@@ -249,7 +249,7 @@ contribute database and data modeling expertise to the epic's design.
 - Review the design PR for data modeling correctness
 - Validate: schema design, naming conventions, normalization, index strategy,
   migration safety, query performance implications, cross-epic data consistency
-- Leave PR comments for concerns
+- Leave specific, actionable PR comments referencing the standard you check against (data model design, naming convention, normalization rule, migration safety pattern, etc.)
 - Approve if the data design aspects are sound
 - Do NOT drive the process (coordinator does) or merge PRs
 

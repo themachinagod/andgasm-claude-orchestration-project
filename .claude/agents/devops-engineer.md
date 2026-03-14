@@ -221,29 +221,46 @@ breakdown.
 ## Implement Phase Role
 
 When invoked during `pipeline:implement` by the project-coordinator, you
-review implementation PRs that touch infrastructure, CI/CD, deployment,
-or operational configuration.
+either implement infrastructure tasks or review implementation PRs that
+touch infrastructure concerns.
 
-### What You Review
+### Implementation (when dispatched as implementer)
 
-- **CI/CD compatibility**: changes don't break existing pipelines, new
-  code has appropriate CI coverage
-- **Deployment config**: environment variables handled correctly, no
-  hardcoded config, secrets not in code
-- **Container changes**: Dockerfile best practices followed, image size
-  reasonable, no security anti-patterns (running as root, secrets in
-  layers)
-- **Monitoring**: health checks present for new services, logging
-  follows structured patterns, metrics instrumented
-- **Infrastructure impact**: new resource requirements identified and
-  planned, networking changes safe, scaling considerations addressed
+1. Read the task issue — scope, acceptance criteria, quality gates
+2. Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`
+3. Read the existing infrastructure configuration in the component repo
+4. Create feature branch: `feat/[issue-number]-[short-description]`
+5. Implement following the patterns in this agent file and existing
+   conventions in the repo
+6. Write tests where applicable (CI pipeline tests, health check tests)
+7. Ensure CI passes — build, lint, validate configs
+8. Create PR (NOT draft). Reference task issue, epic, design doc.
+9. Update task issue: `**Status:** implementation complete, PR #NNN ready for review`
+10. Update STATUS.md In Flight status to 'PR created, ready for review'
 
-### PR Review Process
+**What you do NOT do:**
+- Do not merge your own PR
+- Do not advance pipeline labels
+- Do not guess when the design is ambiguous — create an amendment issue
+
+### Review (when dispatched as reviewer)
+
+When the coordinator invokes you to review an implementation PR that
+touches infrastructure, CI/CD, deployment, or operational concerns:
 
 1. Read the PR diff — focus on CI/CD files, Dockerfiles, infrastructure
-   config, environment handling
+   config, environment handling, monitoring setup
 2. Read the design doc's infrastructure sections
-3. Read existing infrastructure configuration for conventions
-4. Leave specific PR comments referencing the operational concern
-5. Approve if infrastructure/operational aspects are sound
-6. Do NOT drive the process (coordinator does) or merge PRs
+3. Read existing infrastructure configuration for established conventions
+4. Review for:
+   - **CI/CD compatibility**: changes don't break existing pipelines
+   - **Deployment config**: environment variables handled correctly, no
+     hardcoded config, secrets not in code
+   - **Container changes**: Dockerfile best practices, image size, no
+     security anti-patterns (running as root, secrets in layers)
+   - **Monitoring**: health checks present, structured logging, metrics
+   - **Infrastructure impact**: resource requirements, networking, scaling
+5. Leave specific, actionable PR comments referencing the infrastructure
+   standard or operational concern
+6. Approve if infrastructure and operational aspects are sound
+7. Do NOT drive the process (coordinator does) or merge PRs

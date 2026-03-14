@@ -169,7 +169,7 @@ Review the design PR for architectural quality:
 - **Level 0 conformance**: data model, API conventions, auth model alignment
 - **Shared concerns**: logging, error handling, config consistency
 - **Codebase compatibility**: will this design work with existing code?
-- Leave PR comments for concerns
+- Leave specific, actionable PR comments referencing the standard you check against (design doc section, cross-epic integration point, Level 0 conformance requirement, etc.)
 - Approve if architecturally sound
 
 ### What you do NOT do in Design phase

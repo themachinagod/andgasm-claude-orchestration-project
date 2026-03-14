@@ -1037,6 +1037,30 @@ cd ..
 
 Report to the orchestrator that stakeholder input is needed.
 
+#### Step 6a: Amendment Handling (Blocked Tasks)
+
+When an engineer creates an amendment issue (backward transition) and
+adds the `blocked` label to the task:
+
+1. **Acknowledge the block** — read the amendment issue to understand
+   the gap. Verify the amendment has correct labels
+   (`type:amendment,pipeline:[target-stage],blocker`).
+2. **Update STATUS.md** — move the task from In Flight to Blocked
+   with the amendment issue cross-reference.
+3. **Move to other work** — dispatch engineers for other ready tasks.
+   Do not wait for the amendment to resolve.
+4. **Monitor resolution** — when the orchestrator detects the blocking
+   amendment is closed (resolved), it removes the `blocked` label from
+   the task. The task re-enters the ready pool and the coordinator
+   is dispatched for it again.
+5. **Resume the task** — when resuming a previously-blocked task, brief
+   the engineer on what changed upstream (the amendment resolution).
+   The engineer should read the updated design/PRD before continuing.
+
+If the amendment requires stakeholder input, the `needs-stakeholder-input`
+label is added to the amendment issue. Ralph stops for that amendment
+but other unblocked work continues.
+
 #### Step 7: Epic Completion Check
 
 After each task completes, check if all tasks for the epic are done:

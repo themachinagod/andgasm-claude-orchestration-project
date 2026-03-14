@@ -176,6 +176,9 @@ architecture quality.
   virtual scrolling for long lists, defer for heavy components
 - **Rendering efficiency**: no unnecessary re-renders, computed values
   used for derived state, track expressions in loops
+- **Accessibility verification**: WCAG compliance checked with appropriate
+  tooling (axe-core, Lighthouse), keyboard navigation tested, focus
+  management correct, screen reader compatibility considered
 
 ### PR Review Process
 
