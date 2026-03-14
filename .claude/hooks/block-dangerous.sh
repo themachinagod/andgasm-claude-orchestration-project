@@ -28,3 +28,9 @@ DANGEROUS_PATTERNS=(
 for pattern in "${DANGEROUS_PATTERNS[@]}"; do
     if echo "$COMMAND" | grep -qiE "$pattern"; then
         echo "BLOCKED: Dangerous command detected: $pattern"
+        exit 2
+    fi
+done
+
+# Command is safe
+exit 0
