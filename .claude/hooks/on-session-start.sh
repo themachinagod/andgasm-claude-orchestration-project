@@ -6,7 +6,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Generate a unique session ID for this Claude instance.
+# Format: interactive-YYYYMMDDTHHMMSS-PID
+# This ID is used for issue claiming, STATUS.md tracking, and
+# distinguishing concurrent sessions. Every Claude instance gets one.
+SESSION_ID="interactive-$(date '+%Y%m%dT%H%M%S')-$$"
+
+# Persist session ID as env var available to all subsequent Bash calls.
+if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
+    echo "export CLAUDE_SESSION_ID=\"$SESSION_ID\"" >> "$CLAUDE_ENV_FILE"
+fi
+
 echo "=== SESSION START: Workspace Orientation ==="
+echo "Session ID: $SESSION_ID"
 echo ""
 
 cd "$WORKSPACE_ROOT"
@@ -55,4 +67,4 @@ for dir in */; do
 done
 echo ""
 
-echo "=== Read CLAUDE.md for operating manual. ==="
+echo "=== Session ID: $SESSION_ID — Read CLAUDE.md for operating manual. ==="

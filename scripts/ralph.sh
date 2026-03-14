@@ -37,7 +37,7 @@ STAGE_FILTER=""     # empty = all stages; set via --stage
 CYCLE=0
 CONSECUTIVE_FAILURES=0
 MAX_CONSECUTIVE_FAILURES=3
-SESSION_ID="ralph-$(date '+%Y%m%dT%H%M%S')-$"
+SESSION_ID="ralph-$(date '+%Y%m%dT%H%M%S')-$$"
 
 while [[ $# -gt 0 ]]; do
     case $1 in

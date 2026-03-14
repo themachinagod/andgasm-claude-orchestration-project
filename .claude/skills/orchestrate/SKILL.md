@@ -32,7 +32,12 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
 
 ### Phase 1: Orient
 
-1. Read `[DOCS_REPO]/STATUS.md` — check Active Sessions for stale entries (>4 hours), review Watch Items for context that affects this cycle, review In Flight and Blocked for current work state
+1. Note your session ID from the startup hook output (interactive) or
+   prompt (Ralph). Read `[DOCS_REPO]/STATUS.md` — check Active Sessions
+   for stale entries (>4 hours) and for entries from YOUR session ID
+   (should not exist yet — if they do, a prior instance crashed without
+   cleanup). Review Watch Items for context, In Flight and Blocked for
+   current work state.
 2. Read `[DOCS_REPO]/repos.yaml` — understand repo topology
 3. Check for open pipeline issues across all stages:
    ```bash
@@ -99,8 +104,12 @@ follows the orchestration priority in `.claude/rules/pipeline.md`.
 
 Skip rules:
 - `blocked` label → skip until blocker resolved
-- `needs-stakeholder-input` → if interactive: can handle. If Ralph: stop.
-- `claimed:*` label → skip, another session is working on this task
+- `needs-stakeholder-input` → if interactive (session ID starts with
+  `interactive-`): can handle. If Ralph (session ID starts with
+  `ralph-`): stop.
+- `claimed:*` label with a DIFFERENT session ID → skip, another session
+  is working on this. If the claimed label matches YOUR session ID, a
+  prior instance crashed — remove the stale claim and treat as unclaimed.
 
 ### Phase 3: Execute
 
@@ -1026,19 +1035,27 @@ Status values: `In progress`, `PR created (#N)`, `Under review`,
 - Move here from In Flight when blocked
 - Move back to In Flight when blocker resolves
 
-### Detecting Interactive vs. Autonomous
+### Session Identity and Mode Detection
 
-When invoked by ralph.sh, the session is non-interactive — the user is NOT
-present. Ralph passes a prompt that includes "autonomous session" or similar.
+Every Claude instance has a unique session ID, established at startup.
 
-When invoked directly by the user (e.g., they type `/orchestrate` in Claude),
-the session IS interactive.
+**Finding your session ID:**
+- **Interactive sessions:** The `on-session-start.sh` hook outputs
+  `Session ID: interactive-YYYYMMDDTHHMMSS-PID` at startup. This is
+  your session ID for the duration of this Claude instance.
+- **Ralph sessions:** The prompt includes
+  `Session ID: ralph-YYYYMMDDTHHMMSS-PID`.
 
-The key difference: in an interactive session, you CAN engage the user
-directly (invoke facilitator, discuss decomposition concerns). In an
-autonomous session, you MUST stop when stakeholder input is needed.
+**Use your session ID for all claiming operations** — add
+`claimed:[your-session-id]` labels to issues you work on, and skip
+issues with a `claimed:` label from a different session ID.
 
-If unsure whether the session is interactive, check: was the prompt
-structured as a ralph.sh prompt (contains "autonomous" or structured
-orchestration instructions) or was it a direct user request? Default to
-autonomous (safer — don't try to engage without a user).
+**Mode detection is simple:**
+- If your session ID starts with `ralph-` → autonomous mode (user NOT
+  present). Stop when stakeholder input is needed.
+- If your session ID starts with `interactive-` → interactive mode
+  (user IS present). Can engage the user directly.
+
+If you cannot find a session ID in your startup output or prompt,
+generate one: `interactive-[current-timestamp]-unknown`. Default to
+interactive if the user invoked you directly.
