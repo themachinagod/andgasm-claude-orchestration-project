@@ -379,7 +379,14 @@ implementations in your stack.
    - Any decisions made during implementation (with rationale)
 10. Update task issue comment: "implementation complete, PR #NNN
     ready for review"
-11. **Update STATUS.md** — update In Flight status to 'PR created, ready for review'
+11. **Update STATUS.md** — update the In Flight row for this task:
+    change Status to `PR created (#N)`. Direct to main:
+    ```bash
+    cd [DOCS_REPO] && git checkout main && git pull origin main
+    # Edit the In Flight row for this task
+    git add STATUS.md && git commit -m "status: PR created for #[TASK]"
+    git push origin main && cd ..
+    ```
 
 **What you do NOT do:**
 - Do not merge your own PR (coordinator merges on approval)
