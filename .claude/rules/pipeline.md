@@ -404,8 +404,9 @@ add `needs-stakeholder-input` with a summary of what's been bouncing.
 
 Skip rules:
 - `blocked` label → skip until blocker resolved (check if amendment is closed)
-- `needs-stakeholder-input` → skip, report to user
-- `claimed:*` label → skip, another session is working on it
+- `needs-stakeholder-input` → skip (Ralph) or handle (interactive), report to user
+- `claimed:*` label with a different session ID → skip, another session is working on it
+- `claimed:*` label matching your own session ID → stale claim from a crashed prior instance, remove and treat as unclaimed
 
 ## State Update Protocol
 

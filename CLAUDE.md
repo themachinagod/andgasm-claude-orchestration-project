@@ -27,9 +27,34 @@ workspace/
 
 You operate from the workspace root. Use `cd` only for git operations.
 
+## Session Identity
+
+Every Claude instance receives a unique session ID at startup from the
+`on-session-start.sh` hook. The ID appears in the hook output as:
+
+```
+Session ID: interactive-YYYYMMDDTHHMMSS-PID
+```
+
+For Ralph sessions, the ID is passed in the prompt as:
+
+```
+Session ID: ralph-YYYYMMDDTHHMMSS-PID
+```
+
+**Your session ID is your identity for the entire session.** Use it for:
+- Claiming issues: `claimed:[your-session-id]` label
+- STATUS.md Active Sessions table entries
+- Any state that needs to be attributed to this specific session
+
+Two Claude instances running concurrently will have different session
+IDs. Never assume you are the same session as a previous or concurrent
+instance — always use the session ID from YOUR startup output.
+
 ## First Action on Every Session
 
-Run `/orient` to understand current project state before any other work.
+Note your session ID from the startup hook output, then run `/orient`
+to understand current project state before any other work.
 
 Or manually:
 1. Read `[DOCS_REPO]/STATUS.md` for current project state

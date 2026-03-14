@@ -5,8 +5,15 @@
 # hard reset, or database drops. Allows --force-with-lease (safe force push
 # on feature branches after rebase).
 
-# The command being executed is passed via stdin or environment
-COMMAND="${CLAUDE_TOOL_INPUT:-}"
+# Claude Code passes tool input as JSON on stdin.
+# Extract the command from the JSON payload.
+INPUT=$(cat)
+if command -v jq &>/dev/null; then
+    COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
+else
+    # Fallback: extract command value with grep/sed (handles most cases)
+    COMMAND=$(echo "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"command"[[:space:]]*:[[:space:]]*"//;s/"$//')
+fi
 
 # Allow --force-with-lease (safe alternative to --force)
 if echo "$COMMAND" | grep -qiE "force-with-lease"; then
