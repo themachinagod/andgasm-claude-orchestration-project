@@ -182,6 +182,24 @@ contribute CI/CD, infrastructure, and operational expertise to the epic's design
 - Approve if the infrastructure and operational aspects are sound
 - Do NOT drive the process (coordinator does) or merge PRs
 
+### Task Decomposition Advisory (when coordinator invokes you after design approval)
+
+After the design PR is approved and merged, the coordinator invokes you
+to advise on task boundaries for infrastructure/DevOps work. You do NOT
+create task issues — the coordinator does that. You provide the technical
+breakdown.
+
+- Read the merged design in `[DOCS_REPO]/docs/architecture/[epic-name]/`
+- Read the existing CI/CD and infrastructure configuration in relevant repos
+- Propose natural implementation units for the DevOps work:
+  - CI/CD pipeline changes (can often be independent)
+  - Infrastructure provisioning (ordering matters for dependencies)
+  - Containerization changes (Dockerfiles, compose)
+  - Monitoring and observability setup
+- For each proposed task, provide: title, scope description, acceptance
+  criteria, quality gates, and dependency ordering
+- Flag any tasks that must be completed before application code deploys
+
 ### What you read in existing codebase
 - `.github/workflows/` — CI/CD pipeline definitions, job structure
 - `Dockerfile` / `docker-compose.yml` — container configuration, base images

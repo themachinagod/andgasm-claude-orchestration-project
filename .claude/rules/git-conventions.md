@@ -102,7 +102,7 @@ During PRD review, a single PR stays open through the full review cycle:
 | product-manager | PRD PRs (on review team approval) |
 | architect | Architecture doc PRs |
 | frontend-architect | Frontend architecture PRs |
-| project-coordinator | Epic decomposition PRs |
+| project-coordinator | Epic decomposition PRs, epic design PRs |
 | spec-compliance | Component repo implementation PRs (final gate) |
 | release-manager | Release PRs |
 

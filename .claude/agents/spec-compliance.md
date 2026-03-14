@@ -106,7 +106,7 @@ If compliant:
 
 If **implementation** gaps found (engineer missed something):
 - Request changes on the PR with specific gaps
-- Move label back to `pipeline:in-progress`
+- Move label back to `pipeline:implement`
 - Update `[DOCS_REPO]/active-work/` file with findings
 
 If **PRD** gaps found (the spec itself is incomplete or ambiguous):

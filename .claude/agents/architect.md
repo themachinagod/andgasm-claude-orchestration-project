@@ -90,7 +90,9 @@ If concerns persist after 3 PR review cycles, escalate to stakeholder.
 
 - Don't produce architecture designs (that's `pipeline:design`)
 - Don't specify repos or technology choices
-- Don't create implementation tasks
+- Don't create implementation task issues (coordinator does that). When
+  asked to advise on task boundaries for purely architectural epics,
+  provide the technical breakdown but don't create the GitHub issues.
 - Don't advance pipeline labels
 
 ## Design Phase Role

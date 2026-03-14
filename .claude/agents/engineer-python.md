@@ -320,6 +320,22 @@ contribute Python-specific expertise to the epic's design.
 - Approve if the Python aspects are sound
 - Do NOT drive the process (coordinator does) or merge PRs
 
+### Task Decomposition Advisory (when coordinator invokes you after design approval)
+
+After the design PR is approved and merged, the coordinator invokes you
+to advise on task boundaries for your stack. You do NOT create task
+issues — the coordinator does that. You provide the technical breakdown.
+
+- Read the merged design in `[DOCS_REPO]/docs/architecture/[epic-name]/`
+- Read the existing codebase in the relevant Python repos (paths from repos.yaml)
+- Propose natural implementation units for the Python work:
+  - What can be implemented independently?
+  - What depends on what? (ordering)
+  - What's the right granularity? (not too large, not too small)
+- For each proposed task, provide: title, scope description, acceptance
+  criteria, quality gates, and dependency ordering
+- Flag any tasks that cross repo boundaries or depend on other stacks
+
 ### What you read in existing codebase
 - `pyproject.toml` / `requirements.txt` — dependencies, Python version, tooling config
 - `main.py` — FastAPI app factory, lifespan events, middleware registration

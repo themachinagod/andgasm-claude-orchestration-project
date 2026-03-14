@@ -92,7 +92,7 @@ After discussion (or as you go, for clear-cut items):
 3. Create new PRD files if needed (e.g., stakeholder agrees to split a PRD)
 4. Commit changes:
    ```bash
-   git add -A
+   git add docs/prd/ docs/discovery/
    git commit -m "docs: address review feedback — [summary of changes]"
    git push origin [pr-branch-name]
    ```

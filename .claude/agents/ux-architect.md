@@ -107,21 +107,10 @@ When reviewing implementations against UX specs:
 5. Define responsive behavior
 6. Document accessibility requirements
 
-### Git Workflow
-
-```bash
-cd [DOCS_REPO]
-git checkout main && git pull origin main
-git checkout -b docs/ux-[feature-name]
-```
-
-7. Save UX design doc in `[DOCS_REPO]/docs/design/ux/`
-8. Commit: `docs: UX design for [feature]`
-9. Push and create PR: `gh pr create --title "docs: UX design for [feature]"`
-10. Once reviewed and merged (`gh pr merge --squash --delete-branch`):
-    - Advance issue to `pipeline:needs-architecture`
-    - Update `[DOCS_REPO]/STATUS.md` (direct to main — operational state)
-    - `cd ..` to return to workspace root
+7. Return design artifacts to the coordinator for PR creation.
+   The coordinator handles branching, PR creation, and merging.
+   You produce the UX design content and participate in the PR
+   review cycle.
 
 ### When Reviewing Implementations
 
@@ -145,7 +134,7 @@ acceptance criteria:
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: PRD-NNN missing [what]" \
-  --label "type:amendment,pipeline:needs-product-review,blocker" \
+  --label "type:amendment,pipeline:review,blocker" \
   --body "Blocks #[original-issue]. Gap: [specific detail needed for UX design]."
 cd ..
 ```
@@ -160,7 +149,7 @@ onboarding states, admin vs user divergence):
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: PRD-NNN missing user stories for [scenario]" \
-  --label "type:amendment,pipeline:needs-product-review,blocker" \
+  --label "type:amendment,pipeline:review,blocker" \
   --body "Blocks #[original-issue]. UX design revealed [scenario] not covered in PRD."
 cd ..
 ```

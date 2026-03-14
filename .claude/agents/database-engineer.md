@@ -237,6 +237,24 @@ contribute database and data modeling expertise to the epic's design.
 - Approve if the data design aspects are sound
 - Do NOT drive the process (coordinator does) or merge PRs
 
+### Task Decomposition Advisory (when coordinator invokes you after design approval)
+
+After the design PR is approved and merged, the coordinator invokes you
+to advise on task boundaries for data-related work. You do NOT create
+task issues — the coordinator does that. You provide the technical breakdown.
+
+- Read the merged design in `[DOCS_REPO]/docs/architecture/[epic-name]/`
+- Read the existing schemas and migration history in the relevant repos
+- Propose natural implementation units for the data work:
+  - Schema migrations (ordering matters — which changes must come first?)
+  - Data backfill operations (separate from schema changes)
+  - Index additions (can often be independent tasks)
+  - Query layer changes (repository/data access changes)
+- For each proposed task, provide: title, scope description, acceptance
+  criteria, quality gates, and dependency ordering
+- Flag any tasks that must coordinate with other stacks (e.g., schema
+  migration must deploy before API changes)
+
 ### What you read in existing codebase
 - Migration files — schema history, naming patterns, migration conventions
 - ORM model definitions — entity structure, relationships, constraints

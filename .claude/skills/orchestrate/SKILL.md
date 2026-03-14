@@ -46,11 +46,26 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
    # Still inside [DOCS_REPO] from step 3
    ls docs/prd/*.md 2>/dev/null | grep -v templates/
    ```
-   - If PRD files exist (outside `templates/`): this is the Discovery → Review
-     transition. Run the submit-prds logic (see **Stage: Unsubmitted PRDs** below)
+   - If PRD files exist (outside `templates/`), check whether they've
+     already been submitted:
+     ```bash
+     gh issue list --label "type:prd-review" --state all --json number,title
+     ```
+     Also check for new/modified PRD files not yet committed or not yet
+     on a submission branch:
+     ```bash
+     git status --porcelain docs/prd/ docs/discovery/
+     ```
+     **Submit only if:** there are uncommitted/untracked PRD files, OR
+     no `type:prd-review` issues exist at all (first submission ever).
+     If all PRDs are committed, at least one `type:prd-review` issue
+     exists (open or closed), and there are no new changes — these PRDs
+     have already been submitted. Do not re-submit.
+   - If PRDs need submitting: this is the Discovery → Review transition.
+     Run the submit-prds logic (see **Stage: Unsubmitted PRDs** below)
      to create the branch, PR, and `pipeline:review` issue, then continue
      orchestration with the newly created issue.
-   - If no PRD files exist either:
+   - If no PRD files exist, or all PRDs already submitted:
      - Report: "No open pipeline issues and no PRDs to submit. Nothing to orchestrate."
      - Update STATUS.md if needed
      - `cd ..` and stop

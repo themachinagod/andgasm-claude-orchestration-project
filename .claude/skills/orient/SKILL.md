@@ -61,6 +61,63 @@ Determine sub-state:
 cd ..
 ```
 
+### 3b. Check Decompose State
+
+If any issues have `pipeline:decompose` label, check the decompose sub-state:
+
+```bash
+cd [DOCS_REPO]
+gh issue list --state open --label "pipeline:decompose" --json number,title
+```
+
+For each decompose issue:
+```bash
+gh issue view [NUMBER] --json comments --jq '.comments[-1].body'
+gh issue view [NUMBER] --json labels --jq '.labels[].name'
+```
+
+Determine sub-state:
+- No agent comments yet → "Awaiting decomposition"
+- Latest comment says "decomposition proposed" → "PR under review"
+- Latest comment says "concerns addressed" → "PR under re-review"
+- Latest comment says "PR reviewed, approved" → "Approved, ready to merge"
+- Latest comment says "escalated to stakeholder" → "Escalated — needs stakeholder input"
+- Has "needs-stakeholder-input" label → "Waiting for stakeholder input"
+
+```bash
+cd ..
+```
+
+### 3c. Check Design State
+
+If any issues have `pipeline:design` label, check the design sub-state:
+
+```bash
+cd [DOCS_REPO]
+gh issue list --state open --label "pipeline:design" --json number,title
+```
+
+For each design issue:
+```bash
+gh issue view [NUMBER] --json comments --jq '.comments[-1].body'
+gh issue view [NUMBER] --json labels --jq '.labels[].name'
+```
+
+Determine sub-state:
+- No agent comments yet → "Awaiting design"
+- Latest comment says "spike needed" → "Spike in progress"
+- Latest comment says "design proposed" → "PR under review"
+- Latest comment says "concerns addressed" → "PR under re-review"
+- Latest comment says "PR reviewed, approved" → "Approved, ready for task decomposition"
+- Latest comment says "tasks created" → "Design complete, tasks created"
+- Latest comment says "escalated to stakeholder" → "Escalated — needs stakeholder input"
+- Latest comment says "needs-redecompose" → "Sent back to decompose"
+- Has "needs-stakeholder-input" label → "Waiting for stakeholder input"
+
+```bash
+cd ..
+```
+
 ### 4. Check Local Repos
 
 For each component repo path in repos.yaml, check if the directory exists.
@@ -79,6 +136,14 @@ Output a structured report with these sections:
 **Review State** (if applicable)
 - Current review sub-state for any `pipeline:review` issues
 - PR number, review cycle count, items pending
+
+**Decompose State** (if applicable)
+- Current decompose sub-state for any `pipeline:decompose` issues
+- PR number, review cycle count
+
+**Design State** (if applicable)
+- Current design sub-state for each `pipeline:design` epic
+- Which epic, design team assembled, PR status
 
 **Active Epics**
 - List each in-progress epic with current status and blockers

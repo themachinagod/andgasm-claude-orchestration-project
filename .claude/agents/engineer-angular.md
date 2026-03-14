@@ -341,6 +341,22 @@ contribute Angular/TypeScript-specific expertise to the epic's design.
 - Approve if the Angular/TypeScript aspects are sound
 - Do NOT drive the process (coordinator does) or merge PRs
 
+### Task Decomposition Advisory (when coordinator invokes you after design approval)
+
+After the design PR is approved and merged, the coordinator invokes you
+to advise on task boundaries for your stack. You do NOT create task
+issues — the coordinator does that. You provide the technical breakdown.
+
+- Read the merged design in `[DOCS_REPO]/docs/architecture/[epic-name]/`
+- Read the existing codebase in the relevant Angular repos (paths from repos.yaml)
+- Propose natural implementation units for the Angular/TypeScript work:
+  - What can be implemented independently?
+  - What depends on what? (ordering)
+  - What's the right granularity? (not too large, not too small)
+- For each proposed task, provide: title, scope description, acceptance
+  criteria, quality gates, and dependency ordering
+- Flag any tasks that cross repo boundaries or depend on other stacks
+
 ### What you read in existing codebase
 - `angular.json` — project configuration, build targets, budgets
 - `package.json` — Angular version, dependencies, scripts

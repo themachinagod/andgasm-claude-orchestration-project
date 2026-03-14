@@ -105,6 +105,48 @@ Index strategy for new access patterns.]
 
 ---
 
+## UX Design
+
+> Remove this section if the epic has no UX concerns.
+
+### User Flows
+
+[Complete flows for each user story: entry point → happy path → completion.
+Include error states, empty states, loading states, and edge cases.]
+
+### Component Specifications
+
+[New or modified UI components: variants, states, content constraints,
+responsive behavior, accessibility requirements.]
+
+### Accessibility Requirements
+
+[WCAG compliance requirements specific to this epic. Keyboard navigation,
+screen reader behavior, focus management, color contrast.]
+
+---
+
+## Frontend Architecture
+
+> Remove this section if the epic has no frontend concerns.
+
+### Component Architecture
+
+[Smart/dumb component hierarchy, shared components (new vs reuse),
+composition patterns.]
+
+### State Management
+
+[State management approach for this epic's features. Which pattern
+and why. Reference Level 0 conventions if established.]
+
+### Performance Targets
+
+[Bundle budget impact, Core Web Vitals targets, lazy loading strategy,
+SSR/SSG considerations.]
+
+---
+
 ## Cross-Epic Integration
 
 ### Integration with Existing Designs
