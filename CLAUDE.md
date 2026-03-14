@@ -49,7 +49,7 @@ Or manually:
 Issues flow through these stages. Never skip stages.
 
 ```
-Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify → Deliver → Done
+Discovery (manual) → Review → Decompose → Design → Implement → Deliver → Done
 ```
 
 | Stage | Label | Owner | What happens |
@@ -58,8 +58,7 @@ Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify 
 | Review | `pipeline:review` | Review Team + Stakeholder Facilitator | PRD analysis + stakeholder facilitation cycle |
 | Decompose | `pipeline:decompose` | project-coordinator + product-manager + architect | PRDs → epics + roadmap |
 | Design | `pipeline:design` | coordinator + architect + specialists (dynamic) | Architecture, design, task breakdown |
-| Implement | `pipeline:implement` | engineer-[stack] | Per-task coding |
-| Verify | `pipeline:verify` | code-reviewer + test-engineer + security-reviewer + spec-compliance | Review pipeline |
+| Implement | `pipeline:implement` | coordinator + engineer-[stack] + dynamic review team | Per-task coding + specialist PR review |
 | Deliver | `pipeline:deliver` | e2e-test-engineer + tech-writer + release-manager | E2E, docs, release |
 | Done | `pipeline:done` | — | Completed |
 
@@ -70,6 +69,7 @@ Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify 
 | Review | product-manager + architect | orchestrator | stakeholder (via facilitator) | Always — facilitation loop |
 | Decompose | product-manager + architect + coordinator | coordinator | PM + architect (PR review) | Stakeholder if 3+ PR review cycles |
 | Design | coordinator + architect + spec-compliance + specialists (dynamic) | coordinator | architect + spec-compliance + specialists (PR review) | Stakeholder if 3+ PR review cycles |
+| Implement | coordinator + engineer-[stack] + dynamic review team | coordinator | spec-compliance (final gate) + architect + specialists (PR review) | Stakeholder if 3+ PR review cycles |
 
 ### Review Phase (Detail)
 
@@ -226,9 +226,21 @@ stop for stakeholder input.
 - `database-engineer` — schema design, query patterns, migrations (if data concerns)
 - `devops-engineer` — CI/CD, deployment, monitoring (if infra concerns)
 
+### Implement Phase
+- `project-coordinator` — dispatch tasks, assemble review teams, track epic completion, integration verification
+- `engineer-dotnet` — .NET implementation + peer review
+- `engineer-python` — Python implementation + peer review
+- `engineer-angular` — Angular/TS implementation + peer review
+- `engineer-typescript` — Node/TS implementation + peer review
+- `architect` — implementation PR review: design conformance, cross-epic integration, pattern consistency
+- `frontend-architect` — implementation PR review: component architecture, state management, design system
+- `ux-architect` — implementation PR review: accessibility, interaction patterns, UX consistency
+- `database-engineer` — implementation PR review: query efficiency, migration safety, schema conformance
+- `devops-engineer` — implementation PR review: deployment config, environment handling, monitoring
+- `security-reviewer` — implementation PR review: OWASP, injection, auth/authz, secrets, input validation
+- `spec-compliance` — implementation PR review (final gate): acceptance criteria, design conformance, traceability
+
 ### Later Phases (not yet ported)
-- `engineer-*` — stack-specific implementation (implement phase)
-- `code-reviewer`, `security-reviewer`, `test-engineer` — verify
 - `e2e-test-engineer`, `release-manager`, `tech-writer` — deliver
 
 ## State

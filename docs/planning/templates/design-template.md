@@ -179,7 +179,7 @@ established patterns require an ADR.]
 | API contract validation | Schema conformance | [tool] |
 | Build | Zero warnings | [tool] |
 
-### Non-Functional Gates (validated during Verify)
+### Non-Functional Gates (validated during implementation review)
 
 | Gate | Target | How Measured |
 |------|--------|-------------|

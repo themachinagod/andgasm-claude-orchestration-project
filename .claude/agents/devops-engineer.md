@@ -207,3 +207,33 @@ breakdown.
 - Monitoring configuration — health check endpoints, alerting rules
 - Environment configuration — environment variable patterns, secret management
 - Deployment scripts — release process, rollback procedures
+
+## Implement Phase Role
+
+When invoked during `pipeline:implement` by the project-coordinator, you
+review implementation PRs that touch infrastructure, CI/CD, deployment,
+or operational configuration.
+
+### What You Review
+
+- **CI/CD compatibility**: changes don't break existing pipelines, new
+  code has appropriate CI coverage
+- **Deployment config**: environment variables handled correctly, no
+  hardcoded config, secrets not in code
+- **Container changes**: Dockerfile best practices followed, image size
+  reasonable, no security anti-patterns (running as root, secrets in
+  layers)
+- **Monitoring**: health checks present for new services, logging
+  follows structured patterns, metrics instrumented
+- **Infrastructure impact**: new resource requirements identified and
+  planned, networking changes safe, scaling considerations addressed
+
+### PR Review Process
+
+1. Read the PR diff — focus on CI/CD files, Dockerfiles, infrastructure
+   config, environment handling
+2. Read the design doc's infrastructure sections
+3. Read existing infrastructure configuration for conventions
+4. Leave specific PR comments referencing the operational concern
+5. Approve if infrastructure/operational aspects are sound
+6. Do NOT drive the process (coordinator does) or merge PRs

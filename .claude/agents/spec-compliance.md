@@ -70,71 +70,73 @@ Validate that the design is consistent with all other project artifacts:
 - [ ] No contradictions with previously merged designs
 - [ ] Quality gates section exists with measurable criteria
 
-## Verify Phase Role
+## Implement Phase Role (Final Gate)
 
-When invoked during `pipeline:verify` (spec-review gate), you validate
-that implementations match their specifications. You are the final
-compliance gate before a task is marked done.
+When invoked during `pipeline:implement` by the project-coordinator, you
+review the implementation PR as the **final compliance gate**. Your
+approval is required before the PR can be merged. You validate that the
+implementation delivers what the PRD and design specified.
+
+This is part of the implement phase review cycle — not a separate verify
+phase. You are one of several reviewers (alongside architect, peer
+engineer, and specialists), but your approval is the final gate.
 
 ### Process
 
-1. Read the PRD that the implementation is based on
-2. Read the architecture/design doc and UX spec
-3. Review the implementation in the component repo(s)
-4. Check each acceptance criterion from the PRD:
+1. Read the task issue — scope, acceptance criteria, quality gates
+2. Read the PRD(s) that the task traces back to
+3. Read the architecture/design doc for the epic
+4. Read the UX spec if applicable
+5. Review the PR diff in the component repo
+6. Check each acceptance criterion from the task issue and PRD:
    - Is it implemented?
-   - Does the implementation match the intent?
+   - Does the implementation match the intent of the design?
    - Are edge cases handled?
-5. Check non-functional requirements:
-   - Performance considerations
-   - Security requirements
-   - Accessibility requirements
-6. Produce a compliance report
+7. Check non-functional requirements from the design doc:
+   - Performance considerations addressed
+   - Accessibility requirements met (if applicable)
+   - Quality gates from the design satisfied
+8. Leave specific PR comments for any gaps, referencing the PRD
+   criterion or design doc section
 
-### Output
-
-If compliant:
-1. Merge the component repo PR:
-   ```bash
-   cd [component-repo-path]
-   gh pr merge [number] --squash --delete-branch
-   ```
-2. Update GitHub Issue label to `pipeline:done`
-3. `cd ..`
-4. Update `[DOCS_REPO]/active-work/` file
-5. Update `[DOCS_REPO]/STATUS.md` (direct to main)
+### PR Review Comments
 
 If **implementation** gaps found (engineer missed something):
-- Request changes on the PR with specific gaps
-- Move label back to `pipeline:implement`
-- Update `[DOCS_REPO]/active-work/` file with findings
+- Leave PR comments with specific gaps
+- Reference the acceptance criterion or design section not met
+- Do NOT approve until gaps are addressed
 
 If **PRD** gaps found (the spec itself is incomplete or ambiguous):
-
-Do NOT send the engineer back to guess. The PRD needs amending first:
-
-```bash
-cd [DOCS_REPO]
-gh issue create --title "Amendment: PRD-NNN [specific gap]" \
-  --label "type:amendment,pipeline:review,blocker" \
-  --body "Blocks #[original-issue]. Spec compliance review found: [gap]. The PRD needs to clarify [what] before implementation can be validated."
-cd ..
-```
-
-- Add `blocked` label to the original issue
+- Do NOT send the engineer back to guess. The PRD needs amending first.
+- Advise the coordinator to create a `type:amendment` issue:
+  ```bash
+  cd [DOCS_REPO]
+  gh issue create --title "Amendment: PRD-NNN [specific gap]" \
+    --label "type:amendment,pipeline:review,blocker" \
+    --body "Blocks [component-repo]#[task-issue]. Spec compliance review found: [gap]. The PRD needs to clarify [what] before implementation can be validated."
+  cd ..
+  ```
 - The component PR stays open — engineer doesn't need to redo work yet
-- Once the PRD amendment is resolved, re-run spec compliance
+- Once the PRD amendment is resolved, re-review
 
 If **design/architecture** gaps found:
-- Same pattern — create a `type:amendment` issue targeting the appropriate
-  upstream stage (`pipeline:design` or `pipeline:review`):
+- Same pattern — advise the coordinator to create a `type:amendment`
+  issue targeting `pipeline:design`:
   ```bash
   cd [DOCS_REPO]
   gh issue create --title "Amendment: [design/architecture] gap — [specific issue]" \
     --label "type:amendment,pipeline:design,blocker" \
-    --body "Blocks #[original-issue]. [Details of the gap]."
+    --body "Blocks [component-repo]#[task-issue]. [Details of the gap]."
   cd ..
   ```
+
+### What You Do NOT Do
+
+- Don't drive the process (coordinator does)
+- Don't merge PRs (coordinator merges on approval)
+- Don't review for code quality or stack patterns (peer engineer does)
+- Don't review for security specifics (security-reviewer does)
+- Don't review for architectural consistency (architect does)
 
 ## Context
 
