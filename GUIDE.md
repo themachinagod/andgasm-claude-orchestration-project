@@ -202,14 +202,15 @@ The decomposition team works autonomously:
   form natural epics, what initiative themes emerge, what priority ordering
 - **Architect** identifies technical epics (infra, shared libs, auth) not
   in the PRDs, and flags dependency constraints between epics
-- **Coordinator** synthesizes both perspectives into a roadmap document,
-  creates a branch and PR
+- **Coordinator** produces the roadmap from both perspectives (process
+  artifact — delegates all analysis to PM and architect), creates a
+  branch and PR
 
 ### Step 3: PM sign-off
 
 The product-manager reviews the completed roadmap. In most cases, this
 happens autonomously (no user involvement). If the PM has concerns, the
-coordinator revises and re-requests sign-off.
+coordinator routes concerns to the owning sub-agent and re-requests sign-off.
 
 If the team can't converge after 3 revision cycles, it escalates to you.
 Ralph stops. Start an interactive Claude session:
@@ -219,7 +220,8 @@ claude
 ```
 
 The orchestrator will present the unresolved concerns. Discuss, decide,
-and the coordinator will revise the roadmap based on your input.
+and the coordinator will route your input to the relevant sub-agents
+and revise the roadmap.
 
 ### Step 4: Epic issues created
 

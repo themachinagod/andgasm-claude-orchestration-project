@@ -260,17 +260,20 @@ Dispatch the `project-coordinator` as the primary agent:
 
 - "Issue #[NUMBER] is at pipeline:decompose."
 - "Read all approved PRDs in docs/prd/ and discovery docs in docs/discovery/."
-- "Invoke the product-manager for product groupings (including foundational
-  product epics) and the architect for technical analysis (including
-  foundational design epics)."
-- "Synthesize into a roadmap document, create a branch and PR (NOT draft),
-  then manage the PR review cycle with PM and architect."
+- "Delegate product analysis to the product-manager (groupings, foundational
+  product epics) and technical analysis to the architect (foundational
+  design epics, infrastructure, dependencies) — in parallel where possible."
+- "Produce the roadmap from their inputs (process artifact — you own this
+  document but do not write technical or product analysis yourself)."
+- "Create a branch and PR (NOT draft), then manage the PR review cycle
+  with PM and architect. Route revision concerns to the owning sub-agent."
 - "Use the roadmap template at docs/planning/templates/roadmap-template.md."
 
-The coordinator handles the full decompose cycle internally: gathering
-input from PM and architect, producing the roadmap, creating the PR,
-dispatching PM and architect for PR review, addressing comments, and
-re-requesting review (up to 3 cycles before escalating).
+The coordinator handles the full decompose cycle internally: delegating
+analysis to PM and architect, producing the roadmap from their outputs,
+creating the PR, dispatching PM and architect for PR review, routing
+concerns to the owning sub-agent, and re-requesting review (up to 3
+cycles before escalating).
 
 ##### Sub-state: Approved (PR reviewed, approved)
 
@@ -328,13 +331,14 @@ update STATUS.md, report.
 
 ##### Sub-state: Needs Revision
 
-The coordinator needs to revise the roadmap based on PR review feedback.
+The coordinator needs to address PR review feedback.
 Re-dispatch the coordinator:
 
 - "Issue #[NUMBER] needs revision based on PR review feedback."
 - "Read the PR comments from PM and architect."
-- "Revise the roadmap on the PR branch, address each comment, and
-  re-request review from both PM and architect."
+- "Route each concern to the owning sub-agent (product concerns to PM,
+  technical concerns to architect) for revised content."
+- "Update the roadmap on the PR branch and re-request review."
 
 ---
 
@@ -365,9 +369,14 @@ Dispatch the `project-coordinator` as the primary agent:
 - "Assess scope and complexity. Assemble the design team based on
   repos/stacks involved."
 - "If unknowns warrant a spike, run a time-boxed investigation first."
-- "Invoke the architect and specialists to produce design artifacts."
-- "Create a branch and design PR (NOT draft), then manage the PR
-  review cycle with the design team."
+- "Delegate all design production to the architect and specialists —
+  you do not write design content yourself."
+- "Collate sub-agent outputs into the design document (editor, not
+  author), create a branch and design PR (NOT draft), then manage the
+  PR review cycle with the design team."
+- "Route revision concerns to the sub-agent who owns that content."
+- "After approval, decompose into tasks by invoking relevant engineer
+  agents for task boundary advice, then assemble and create task issues."
 - "Use the design template at docs/planning/templates/design-template.md."
 
 **Epic ordering:** Level 0 (foundational) epics are designed first —
@@ -375,14 +384,17 @@ their outputs constrain all subsequent designs. Within a level, follow
 the dependency order from the roadmap (`docs/planning/roadmap.md`).
 
 The coordinator handles the full design cycle internally: assessment,
-team assembly, design production, PR creation, review cycle, and task
-decomposition (up to 3 review cycles before escalating).
+team assembly, delegating design production to sub-agents, collating
+outputs, PR creation, review cycle (routing concerns to owning
+sub-agents), and task decomposition with engineer input (up to 3
+review cycles before escalating).
 
 ##### Sub-state: Spike Needed
 
 The coordinator has identified genuine unknowns that need investigation
-before committing to a full design. The coordinator runs a time-boxed
-spike (prototype, benchmark, or proof-of-concept) in a throwaway branch.
+before committing to a full design. The coordinator delegates the spike
+to the architect (and relevant specialists) for a time-boxed
+investigation in a throwaway branch.
 
 On completion, the coordinator updates the issue comment to
 "spike completed, findings recorded" and the epic returns to the
@@ -392,7 +404,8 @@ coordinator to continue with the full design.
 ##### Sub-state: Approved (PR reviewed, approved)
 
 All reviewers have approved the design PR. The coordinator merges the
-PR and creates task issues in component repos:
+PR and decomposes into tasks (invoking relevant engineer agents for
+task boundary advice, then assembling and creating task issues):
 
 ```bash
 cd [DOCS_REPO]

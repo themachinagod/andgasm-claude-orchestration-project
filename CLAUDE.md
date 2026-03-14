@@ -105,12 +105,14 @@ of epics. The `pipeline:decompose` label stays throughout. Sub-state is
 tracked via issue comments.
 
 **Team:**
-- `project-coordinator` (primary) — drives the process, invokes PM and
-  architect, synthesizes roadmap, manages PR review cycle
-- `product-manager` — product groupings, foundational product epics,
-  initiative themes, PR review authority
-- `architect` — foundational design epics, infrastructure epics,
-  dependency constraints, PR review authority
+- `project-coordinator` (primary) — process manager: delegates analysis
+  to PM and architect, produces roadmap from their inputs, manages PR
+  review cycle. Never writes technical or product analysis — only
+  process artifacts.
+- `product-manager` — product analysis: groupings, foundational product
+  epics, initiative themes, PR review authority
+- `architect` — technical analysis: foundational design epics,
+  infrastructure epics, dependency constraints, PR review authority
 
 **Sub-states:**
 
@@ -145,8 +147,10 @@ for each epic, then decomposes into implementation tasks. The
 issue comments.
 
 **Team (dynamic per epic):**
-- `project-coordinator` (primary) — drives the process, assembles team,
-  manages PR review cycle, decomposes into tasks after approval
+- `project-coordinator` (primary) — process manager: assembles team,
+  delegates all design production to sub-agents, collates outputs,
+  manages PR review cycle, decomposes into tasks (with engineer input
+  on task boundaries)
 - `architect` (always) — system design, cross-epic consistency, ADRs,
   codebase patterns
 - `spec-compliance` (if PRD linkage) — PRD coverage + cross-document
@@ -205,12 +209,12 @@ stop for stakeholder input.
 - `stakeholder-facilitator` — mediates between review findings and user
 
 ### Decompose Phase
-- `project-coordinator` — drives decomposition, synthesizes PM + architect input into roadmap, manages PR review cycle
-- `product-manager` — product groupings, foundational product epics, initiative themes, PR review
-- `architect` — foundational design epics, infrastructure epics, dependency identification, PR review
+- `project-coordinator` — process manager: delegates analysis to PM and architect, produces roadmap from their inputs, manages PR review cycle
+- `product-manager` — product analysis: groupings, foundational product epics, initiative themes, PR review
+- `architect` — technical analysis: foundational design epics, infrastructure epics, dependency identification, PR review
 
 ### Design Phase
-- `project-coordinator` — drives design process, assembles team, manages PR review cycle, task decomposition
+- `project-coordinator` — process manager: assembles team, delegates all design to sub-agents, collates outputs, manages PR review cycle, task decomposition (with engineer input)
 - `architect` — system design, cross-epic consistency, ADRs, codebase patterns
 - `spec-compliance` — PRD coverage (vertical) + cross-document consistency (horizontal) reviewer
 - `frontend-architect` — component architecture, state management, performance budgets (UI epics)

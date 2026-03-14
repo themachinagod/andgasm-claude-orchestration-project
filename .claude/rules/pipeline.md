@@ -71,17 +71,17 @@ label is only added when the team cannot converge (circuit breaker).
 
 | Agent | Role | What they do |
 |-------|------|-------------|
-| project-coordinator (primary) | Drives the process | Invokes PM and architect, synthesizes roadmap, creates PR, manages PR review cycle |
-| product-manager | Product grouping + PR review | Proposes product groupings + foundational product epics, reviews roadmap PR |
+| project-coordinator (primary) | Process manager | Delegates analysis to PM and architect, produces roadmap from their inputs (process artifact), manages PR review cycle. Never writes technical or product analysis. |
+| product-manager | Product analysis + PR review | Proposes product groupings + foundational product epics, reviews roadmap PR |
 | architect | Technical analysis + PR review | Identifies foundational design epics + infrastructure epics, reviews roadmap PR |
 
 ### Sub-State Machine
 
 | Sub-state | Detected by | Next action |
 |-----------|------------|-------------|
-| Issue created (no agent comments) | No decompose comment from agents | Coordinator produces roadmap |
+| Issue created (no agent comments) | No decompose comment from agents | Coordinator delegates to PM + architect, produces roadmap |
 | "decomposition proposed, PR ready for review" | Coordinator comment | PM + architect review the PR |
-| "PR reviewed, N concerns raised" | PM/architect PR comments | Coordinator addresses PR comments |
+| "PR reviewed, N concerns raised" | PM/architect PR comments | Coordinator routes concerns to owning sub-agent |
 | "PR reviewed, approved" | PM/architect comment (all concerns resolved) | Merge PR, create epic issues at `pipeline:design` |
 | "escalated to stakeholder" | Coordinator comment (3+ review cycles) | If interactive: engage user. If Ralph: stop |
 | "stakeholder input provided" | User/facilitator comment | Coordinator revises |
@@ -89,10 +89,11 @@ label is only added when the team cannot converge (circuit breaker).
 ### PR Review Cycle
 
 PM and architect review the roadmap PR with actual PR comments (same
-mechanism as the review phase). The coordinator addresses concerns on
-the branch and requests re-review. Both PM and architect must approve
-the PR for it to merge. The stakeholder is NOT involved unless the
-circuit breaker triggers.
+mechanism as the review phase). The coordinator routes each concern to
+the sub-agent who owns that content (product concerns to PM, technical
+concerns to architect), then updates the branch and requests re-review.
+Both PM and architect must approve the PR for it to merge. The
+stakeholder is NOT involved unless the circuit breaker triggers.
 
 ### Circuit Breaker
 
@@ -111,8 +112,8 @@ label is only added when the circuit breaker triggers.
 
 | Agent | When | Role |
 |-------|------|------|
-| project-coordinator | Always | Drives the process, assembles team, manages PR review cycle, task decomposition |
-| architect | Always | System design, cross-epic consistency, ADRs, integration, codebase patterns |
+| project-coordinator | Always | Process manager: assembles team, delegates all design to sub-agents, collates outputs, manages PR review cycle, task decomposition (with engineer input on boundaries) |
+| architect | Always | Primary design producer: system design, cross-epic consistency, ADRs, integration, codebase patterns |
 | spec-compliance | If epic has PRD linkage | PRD coverage (vertical) + cross-document consistency (horizontal) |
 | frontend-architect | If epic has UI | Component architecture, state management, performance budgets |
 | ux-architect | If epic has UX | User flows, interaction design, accessibility |
@@ -149,9 +150,11 @@ from the assembled design team. Reviewers leave PR comments:
 - **Spec-compliance**: PRD coverage, cross-document consistency, terminology
 - **Specialists**: stack-specific technical correctness
 
-The coordinator addresses comments on the branch (consulting architect
-for architectural concerns, specialists for stack concerns) and re-requests
-review. Both architect and spec-compliance (when present) must approve.
+The coordinator routes each concern to the sub-agent who owns that
+content (architecture concerns to architect, stack concerns to the
+relevant specialist), takes revised content back, updates the branch,
+and re-requests review. Both architect and spec-compliance (when
+present) must approve.
 
 ### Circuit Breaker
 
