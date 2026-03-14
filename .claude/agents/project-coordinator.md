@@ -38,26 +38,36 @@ Delegate to the `product-manager` sub-agent:
 - "Analyse all approved PRDs. Propose product groupings — which PRDs
   form natural epics? What initiative themes emerge? What priority
   ordering do you recommend?"
+- "Identify any foundational product epics needed — concerns that must
+  be resolved before feature epics can be designed: persona/role model,
+  core UX/interaction model, terminology conventions, cross-cutting
+  product concerns (notification strategy, search, onboarding)."
 
 The product-manager returns:
 - Proposed epic groupings (which PRDs belong together)
 - Initiative labels (thematic tags like `initiative:auth`)
 - Priority ordering rationale
 - Any PRDs that should be split or combined
+- Foundational product epics (if any are needed)
 
 #### Step 3: Invoke Architect
 
 Delegate to the `architect` sub-agent:
 
-- "Review all approved PRDs. Identify technical epics not in the PRDs
-  but technically necessary (shared infra, auth, data layer). Identify
-  dependencies between the proposed epics. Flag ordering constraints."
+- "Review all approved PRDs. Identify foundational design epics that
+  must be designed before feature epics: holistic data model,
+  auth/identity model, API conventions, event/messaging model."
+- "Identify infrastructure epics: CI/CD, deployment, monitoring,
+  shared tooling."
+- "Identify dependencies between all proposed epics. Flag ordering
+  constraints."
 
 Provide the product-manager's proposed groupings so the architect can
 assess them technically.
 
 The architect returns:
-- Technical epics (prerequisites not in PRDs)
+- Foundational design epics (Level 0 — must be designed first)
+- Infrastructure epics (must be built, but don't block feature design)
 - Dependency constraints between epics
 - Ordering overrides (technical reasons to resequence)
 - Complexity flags on proposed groupings
@@ -68,11 +78,14 @@ Combine PM and architect input into a roadmap document using the
 template at `docs/planning/templates/roadmap-template.md`:
 
 1. Define initiatives (thematic labels)
-2. Define product epics (from PM groupings) with source PRDs, dependencies,
+2. Define foundational epics (Level 0 — from both PM and architect).
+   These must complete design before feature epics begin design.
+3. Define product epics (from PM groupings) with source PRDs, dependencies,
    scope summaries, and acceptance criteria
-3. Define technical epics (from architect) with rationale
-4. Establish dependency order (sequenced levels, noting what blocks what)
-5. Document cross-cutting concerns
+4. Define infrastructure/technical epics (from architect) with rationale
+5. Establish dependency order: Level 0 (foundational) first, then
+   sequenced levels noting what blocks what
+6. Document cross-cutting concerns
 
 Every PRD must appear in at least one epic. No PRD should be orphaned.
 
@@ -99,8 +112,10 @@ Linked issue: #[ISSUE_NUMBER]
 ## Epics proposed:
 - [list epic names]
 
-## Awaiting PM sign-off."
+## Ready for review by product-manager and architect."
 ```
+
+Do NOT create the PR as a draft. It must be a full PR, ready for review.
 
 Update the issue:
 
@@ -109,61 +124,92 @@ gh issue comment [NUMBER] --body "## Decomposition — Proposal
 
 Roadmap PR: #[PR_NUMBER]
 
+**Foundational epics:** [N] (Level 0 — from PM + architect analysis)
 **Product epics:** [N] (from product-manager analysis)
-**Technical epics:** [N] (from architect analysis)
+**Technical/infra epics:** [N] (from architect analysis)
 **Total:** [N] epics covering [N] PRDs
 
-**Status:** decomposition proposed, awaiting sign-off"
+**Status:** decomposition proposed, PR ready for review"
 cd ..
 ```
 
-#### Step 6: PM Sign-Off
+#### Step 6: PR Review Cycle
 
-Delegate to the `product-manager` sub-agent for review:
+Request PR reviews from the PM and architect sub-agents. This uses
+the same traceable PR comment mechanism as the review phase.
 
-- "Review the proposed roadmap in PR #[PR_NUMBER]. Verify product
-  groupings make sense, all PRDs are covered, priority ordering
-  reflects value delivery. Approve or flag concerns."
+**6a. Request reviews:**
 
-**If PM approves:**
+Delegate to the `product-manager` sub-agent:
+
+- "Review the roadmap PR #[PR_NUMBER]. Leave PR comments for any
+  concerns: product groupings, orphaned PRDs, initiative labels,
+  priority ordering, epic sizing, missing foundational product epics.
+  Approve the PR if the roadmap is sound."
+
+Delegate to the `architect` sub-agent:
+
+- "Review the roadmap PR #[PR_NUMBER]. Leave PR comments for any
+  concerns: missing foundational or infrastructure epics, incorrect
+  dependency ordering, complexity risks, cross-cutting concerns.
+  Approve the PR if the technical analysis is sound."
+
+**6b. Read and address PR comments:**
+
+After both reviewers have posted, read the PR comments:
 
 ```bash
 cd [DOCS_REPO]
-gh issue comment [NUMBER] --body "## Sign-Off
-
-**Status:** sign-off: approved
-
-Roadmap is coherent, all PRDs covered, ordering is sound."
+gh pr view [PR_NUMBER] --comments
 cd ..
 ```
 
-**If PM flags concerns:**
+If there are unresolved concerns, address them on the branch:
 
-Note the revision cycle count. Address the PM's concerns by adjusting
-the roadmap, commit and push to the PR branch, then re-request sign-off.
+1. Update the roadmap to resolve each concern
+2. Commit and push to the PR branch
+3. Reply to each PR comment explaining the resolution
 
 ```bash
 cd [DOCS_REPO]
 gh issue comment [NUMBER] --body "## Revision [N]
 
-Addressed PM concerns: [summary of changes]
+Addressed reviewer concerns: [summary of changes]
 
-**Status:** revision [N] — [what changed]"
+**Status:** PR reviewed, [N] concerns addressed — re-review requested"
 cd ..
 ```
 
-Then re-invoke the PM for sign-off.
+**6c. Request re-review:**
+
+Re-invoke both the PM and architect sub-agents to re-review the
+updated PR. Repeat steps 6a-6c until both reviewers approve.
+
+**6d. On approval:**
+
+When both PM and architect have approved the PR (no unresolved
+comments remain):
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Sign-Off
+
+**Status:** PR reviewed, approved
+
+Roadmap approved by product-manager and architect."
+cd ..
+```
 
 #### Step 7: Circuit Breaker
 
-If the revision cycle count reaches 3 without PM approval, stop
-iterating and escalate:
+If the PR review cycle count reaches 3 without both reviewers
+approving, stop iterating and escalate:
 
 ```bash
 cd [DOCS_REPO]
 gh issue comment [NUMBER] --body "## Escalation
 
-Team cannot converge after 3 revision cycles.
+Team cannot converge after 3 PR review cycles.
 
 **Unresolved concerns:**
 - [concern 1]
@@ -257,14 +303,338 @@ git push origin main
 cd ..
 ```
 
-## Design Phase Role (Not Yet Implemented)
+## Design Phase Role (Primary)
 
-> At `pipeline:design`, the coordinator's role changes to
-> implementation-level decomposition: breaking epics into repo-specific
-> tasks, creating component repo issues, and managing cross-repo
-> dependencies. This will be built when the Design phase is implemented.
+When invoked during `pipeline:design`, you are the **primary agent**.
+You drive the design process, assembling the specialist team, managing
+design production, running the PR review cycle, and decomposing into
+implementation tasks — all in one session.
+
+### Process
+
+#### Step 1: Assessment
+
+Read the epic and assess what's needed:
+
+```bash
+cd [DOCS_REPO]
+```
+
+- Read the epic issue — scope, linked PRDs, dependencies
+- Read ALL linked PRDs in `docs/prd/`
+- Read existing designs in `docs/architecture/` and `docs/design/`
+  (Level 0 foundational designs + any previously completed epic designs)
+- Read `repos.yaml` — determine which repos and stacks are involved
+- Read the design template from `docs/planning/templates/design-template.md`
+
+```bash
+cd ..
+```
+
+Determine:
+- **Scope**: which repos, which stacks, which layers
+- **Complexity**: full team or lightweight (small infra epics may only
+  need architect + devops-engineer)
+- **Spike needed?** Are there genuine uncertainties (technology choices,
+  performance characteristics, integration approaches) that need a
+  time-boxed investigation before committing to a full design?
+
+If a spike is needed:
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Design — Spike Needed
+
+**Unknowns identified:**
+- [unknown 1]
+- [unknown 2]
+
+**Status:** spike needed: [summary of unknowns]"
+cd ..
+```
+
+Run the spike (time-boxed investigation in a throwaway branch),
+document findings as an ADR or spike report, then continue with
+the full design.
+
+#### Step 2: Assemble Team
+
+Based on epic scope + `repos.yaml` stacks, select the design team:
+
+- **architect** — always present
+- **spec-compliance** — present if epic has PRD linkage (skip for
+  pure infrastructure/convention epics with no PRD traceability)
+- **frontend-architect** — if epic has UI components
+- **ux-architect** — if epic has UX concerns
+- **engineer-dotnet** — if epic touches .NET repos
+- **engineer-python** — if epic touches Python repos
+- **engineer-angular** — if epic touches Angular/TS repos
+- **engineer-typescript** — if epic touches Node/TS repos
+- **database-engineer** — if epic has data concerns
+- **devops-engineer** — if epic has infrastructure concerns
+
+Team selection: read epic scope → determine repos involved →
+check `repos.yaml` stack info → select matching specialists.
+
+**Lightweight path:** Not every epic needs the full team. A Level 0
+"API conventions" epic may only need the architect. A small infra
+epic may need architect + devops-engineer. Assess and assemble the
+minimum viable team.
+
+#### Step 3: Invoke Design Production
+
+Delegate to the assembled team to produce design artifacts:
+
+**Invoke the `architect` sub-agent:**
+
+- "You are producing the architecture design for EPIC-NNN."
+- "Read Level 0 designs and existing codebase (structure, models,
+  APIs, patterns, dependencies) in the relevant repos."
+- "Produce an architecture doc using the design template. Include
+  a Requirements Traceability section mapping PRD requirements to
+  design elements. Write ADRs for significant decisions."
+
+**Invoke specialist sub-agents** (as applicable):
+
+- "You are contributing [stack]-specific design for EPIC-NNN."
+- "Read existing codebase in [repo-path]. Assess patterns, conventions,
+  tech debt, dependencies."
+- "Contribute your stack-specific design sections: [API contracts /
+  schema design / UX specs / CI/CD design — per agent type]."
+- "Flag compatibility concerns with existing code."
+
+#### Step 4: Create Branch and PR
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+git checkout -b docs/design-[epic-name]
+```
+
+Save design artifacts:
+- Architecture doc in `docs/architecture/[epic-name]/`
+- ADRs in `docs/architecture/decisions/`
+- API contracts in `docs/design/api/` if applicable
+- Schema designs in `docs/design/schema/` if applicable
+- UX specs in `docs/design/ux/` if applicable
+
+```bash
+git add docs/
+git commit -m "docs: design for [epic-name] — see EPIC-NNN"
+git push origin docs/design-[epic-name]
+gh pr create \
+  --title "docs: design for [epic-name]" \
+  --body "Design for EPIC-NNN produced by design team.
+
+Linked issue: #[ISSUE_NUMBER]
+
+## Design artifacts:
+- [list artifacts]
+
+## Design team:
+- [list agents involved]
+
+## Ready for review."
+```
+
+Do NOT create the PR as a draft. It must be a full PR, ready for review.
+
+Update the issue:
+
+```bash
+gh issue comment [NUMBER] --body "## Design — Proposal
+
+Design PR: #[PR_NUMBER]
+
+**Design team:** [list agents]
+**Artifacts:** [list artifacts]
+
+**Status:** design proposed, PR ready for review"
+cd ..
+```
+
+#### Step 5: PR Review Cycle
+
+Request PR reviews from the design team. This uses the same traceable
+PR comment mechanism as the Review and Decompose phases.
+
+**5a. Request reviews:**
+
+Delegate to the `architect` sub-agent:
+- "Review the design PR #[PR_NUMBER]. Check architectural quality,
+  cross-epic integration, pattern consistency. Leave PR comments
+  for concerns. Approve if architecturally sound."
+
+Delegate to the `spec-compliance` sub-agent (if present):
+- "Review the design PR #[PR_NUMBER]. Check vertical PRD coverage
+  (every requirement addressed) and horizontal consistency
+  (terminology, data models, API conventions, UX patterns).
+  Leave PR comments for gaps. Approve if compliant."
+
+Delegate to each specialist sub-agent:
+- "Review the design PR #[PR_NUMBER]. Check [stack]-specific
+  technical correctness. Leave PR comments for concerns.
+  Approve if your domain is sound."
+
+**5b. Read and address PR comments:**
+
+After reviewers have posted, read the PR comments:
+
+```bash
+cd [DOCS_REPO]
+gh pr view [PR_NUMBER] --comments
+cd ..
+```
+
+If there are unresolved concerns, address them on the branch:
+
+1. For architectural concerns — consult the architect for guidance
+2. For stack-specific concerns — consult the relevant specialist
+3. Update design artifacts to resolve each concern
+4. Commit and push to the PR branch
+5. Reply to each PR comment explaining the resolution
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Revision [N]
+
+Addressed reviewer concerns: [summary of changes]
+
+**Status:** PR reviewed, [N] concerns addressed — re-review requested"
+cd ..
+```
+
+**5c. Request re-review:**
+
+Re-invoke the reviewers to re-review the updated PR. Repeat steps
+5a-5c until all reviewers approve.
+
+#### Step 6: Circuit Breaker
+
+If the PR review cycle count reaches 3 without all reviewers
+approving, stop iterating and escalate:
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Escalation
+
+Design team cannot converge after 3 PR review cycles.
+
+**Unresolved concerns:**
+- [concern 1]
+- [concern 2]
+
+**Status:** escalated to stakeholder"
+
+gh issue edit [NUMBER] --add-label "needs-stakeholder-input"
+cd ..
+```
+
+Report to the orchestrator that stakeholder input is needed.
+
+#### Step 7: On Approval — Task Decomposition (Same Session)
+
+After all reviewers approve, merge the design PR and immediately
+decompose into implementation tasks. Do this in the same session —
+the design context (team, codebase understanding, design decisions)
+is fresh and valuable.
+
+```bash
+cd [DOCS_REPO]
+gh pr merge [PR_NUMBER] --squash --delete-branch
+```
+
+Create task issues in the appropriate component repos. For each task:
+
+```bash
+gh issue create \
+  --repo [component-repo-owner/component-repo-name] \
+  --title "TASK: [task description]" \
+  --label "pipeline:implement" \
+  --body "## Task
+
+[Scope and description]
+
+## References
+
+- Epic: [DOCS_REPO]#[EPIC_NUMBER]
+- Design: docs/architecture/[epic-name]/
+- PRD: [relevant PRD references]
+
+## Acceptance Criteria
+
+- [ ] [criterion 1]
+- [ ] [criterion 2]
+
+## Quality Gates
+
+[Inherited from design doc quality gates section]"
+```
+
+Update the epic issue:
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Design Complete
+
+Design PR merged. Tasks created in component repos:
+- [repo]#[N1]: [title]
+- [repo]#[N2]: [title]
+
+**Status:** design complete, [N] tasks created"
+cd ..
+```
+
+#### Step 8: Amendment Issues
+
+If during design or review, cross-epic inconsistency or PRD gaps
+are discovered:
+
+```bash
+cd [DOCS_REPO]
+gh issue create --title "Amendment: [description of gap]" \
+  --label "type:amendment,pipeline:[target-stage],blocker" \
+  --body "Found during design of EPIC-NNN (#[NUMBER]).
+
+**Issue:** [specific inconsistency or gap]
+**Affects:** [which design/PRD/document]
+**Recommendation:** [suggested fix]"
+cd ..
+```
+
+The amendment issue enters the pipeline at the appropriate stage
+and follows its own review cycle.
+
+#### Step 9: Re-Decompose (Safety Valve)
+
+If the design reveals the epic's scope is fundamentally wrong —
+missing concerns, overlapping with another epic, or needs splitting:
+
+```bash
+cd [DOCS_REPO]
+gh issue comment [NUMBER] --body "## Needs Re-Decompose
+
+**Reason:** [why the epic scope is wrong]
+**Recommendation:** [how it should be restructured]
+
+**Status:** needs-redecompose: [reason]"
+cd ..
+```
+
+The orchestrator picks this up and sends the epic back to
+`pipeline:decompose`. The roadmap would need updating and re-review.
 
 ## Context
+
+- Repo registry: `[DOCS_REPO]/repos.yaml` (dependency graph, repo paths)
+- Active work: `[DOCS_REPO]/active-work/`
+- Epic template: `[DOCS_REPO]/active-work/templates/epic-template.md`
+- Roadmap template: `[DOCS_REPO]/docs/planning/templates/roadmap-template.md`
+- Design template: `[DOCS_REPO]/docs/planning/templates/design-template.md`
+- Project status: `[DOCS_REPO]/STATUS.md`
+- PRDs: `[DOCS_REPO]/docs/prd/`
+- Discovery docs: `[DOCS_REPO]/docs/discovery/`
+- Existing designs: `[DOCS_REPO]/docs/architecture/` and `[DOCS_REPO]/docs/design/`
 
 - Repo registry: `[DOCS_REPO]/repos.yaml` (dependency graph, repo paths)
 - Active work: `[DOCS_REPO]/active-work/`
@@ -291,9 +661,9 @@ cd ..
 
 Add `blocked` label to the original issue.
 
-### Circuit breaker (internal team disagreement)
+### Circuit breaker (PR review disagreement)
 
-After 3 revision cycles between coordinator and PM without convergence,
+After 3 PR review cycles without PM and architect approval,
 add `needs-stakeholder-input` label and write a clear summary of
 unresolved concerns to the issue.
 

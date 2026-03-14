@@ -57,7 +57,7 @@ Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify 
 | Discovery | (manual) | User | Write PRDs and vision docs in IDE |
 | Review | `pipeline:review` | Review Team + Stakeholder Facilitator | PRD analysis + stakeholder facilitation cycle |
 | Decompose | `pipeline:decompose` | project-coordinator + product-manager + architect | PRDs → epics + roadmap |
-| Design | `pipeline:design` | architect + frontend-architect + ux-architect | Architecture, UX, task breakdown |
+| Design | `pipeline:design` | coordinator + architect + specialists (dynamic) | Architecture, design, task breakdown |
 | Implement | `pipeline:implement` | engineer-[stack] | Per-task coding |
 | Verify | `pipeline:verify` | code-reviewer + test-engineer + security-reviewer + spec-compliance | Review pipeline |
 | Deliver | `pipeline:deliver` | e2e-test-engineer + tech-writer + release-manager | E2E, docs, release |
@@ -68,8 +68,8 @@ Discovery (manual) → Review → Decompose → Design → Implement ↔ Verify 
 | Stage | Team | Primary | Sign-off | Escalation |
 |-------|------|---------|----------|------------|
 | Review | product-manager + architect | orchestrator | stakeholder (via facilitator) | Always — facilitation loop |
-| Decompose | product-manager + architect + coordinator | coordinator | product-manager | Stakeholder if 3+ revision cycles |
-| Design | (TBD) | (TBD) | (TBD) | (TBD) |
+| Decompose | product-manager + architect + coordinator | coordinator | PM + architect (PR review) | Stakeholder if 3+ PR review cycles |
+| Design | coordinator + architect + spec-compliance + specialists (dynamic) | coordinator | architect + spec-compliance + specialists (PR review) | Stakeholder if 3+ PR review cycles |
 
 ### Review Phase (Detail)
 
@@ -106,39 +106,91 @@ tracked via issue comments.
 
 **Team:**
 - `project-coordinator` (primary) — drives the process, invokes PM and
-  architect, synthesizes roadmap, manages sign-off cycle
-- `product-manager` — product groupings, initiative themes, priority
-  ordering, sign-off authority
-- `architect` — technical epics, dependency constraints, ordering
+  architect, synthesizes roadmap, manages PR review cycle
+- `product-manager` — product groupings, foundational product epics,
+  initiative themes, PR review authority
+- `architect` — foundational design epics, infrastructure epics,
+  dependency constraints, PR review authority
 
 **Sub-states:**
 
 | Sub-state | Signal | Next action |
 |-----------|--------|-------------|
-| Needs decomposition | No agent comments on issue | Coordinator decomposes |
-| Proposal ready | Coordinator: "decomposition proposed, awaiting sign-off" | PM reviews |
-| Approved | PM: "sign-off: approved" | Merge PR, create epic issues |
-| Needs revision | PM: "sign-off: concerns" | Coordinator revises |
+| Needs decomposition | No agent comments on issue | Coordinator produces roadmap |
+| PR under review | Coordinator: "decomposition proposed, PR ready for review" | PM + architect review PR |
+| Needs revision | PM/architect PR comments with concerns | Coordinator addresses comments |
+| Approved | PM + architect: "PR reviewed, approved" | Merge PR, create epic issues |
 | Escalated | Coordinator: "escalated to stakeholder" (3+ cycles) | User engages |
 
-**Circuit breaker:** After 3 internal revision cycles without PM approval,
-the coordinator adds `needs-stakeholder-input` and writes a summary of
-unresolved concerns. Ralph stops and the user resolves directly.
+**Circuit breaker:** After 3 PR review cycles without PM and architect
+approval, the coordinator adds `needs-stakeholder-input` and writes a
+summary of unresolved concerns. Ralph stops and the user resolves directly.
 
 **Outputs:**
-- Roadmap document in `[DOCS_REPO]/docs/planning/roadmap.md`
+- Roadmap document in `[DOCS_REPO]/docs/planning/roadmap.md` (includes
+  foundational epics at Level 0, product epics, and technical/infra epics)
 - Epic issues in docs repo at `pipeline:design`
 - Initiative labels applied to epic issues (e.g., `initiative:auth`)
 
-**Ralph integration:** Ralph runs the coordinator autonomously. The PM
-sign-off happens within the same session (autonomous, no user needed).
-Only if the circuit breaker triggers does Ralph stop for stakeholder input.
+**Ralph integration:** Ralph runs the coordinator autonomously. The PR
+review cycle (PM + architect reviewing with PR comments) happens within
+the same session (autonomous, no user needed). Only if the circuit
+breaker triggers does Ralph stop for stakeholder input.
+
+### Design Phase (Detail)
+
+The design phase produces architecture docs, ADRs, and design artifacts
+for each epic, then decomposes into implementation tasks. The
+`pipeline:design` label stays throughout. Sub-state is tracked via
+issue comments.
+
+**Team (dynamic per epic):**
+- `project-coordinator` (primary) — drives the process, assembles team,
+  manages PR review cycle, decomposes into tasks after approval
+- `architect` (always) — system design, cross-epic consistency, ADRs,
+  codebase patterns
+- `spec-compliance` (if PRD linkage) — PRD coverage + cross-document
+  consistency reviewer
+- Specialists (dynamic from repos.yaml) — stack-specific design +
+  codebase review (frontend-architect, ux-architect, engineer-dotnet,
+  engineer-python, engineer-angular, engineer-typescript,
+  database-engineer, devops-engineer)
+
+**Sub-states:**
+
+| Sub-state | Signal | Next action |
+|-----------|--------|-------------|
+| Needs design | No agent comments on issue | Coordinator assesses + assembles team |
+| Spike needed | Coordinator: "spike needed: [unknowns]" | Coordinator runs time-boxed spike |
+| PR under review | Coordinator: "design proposed, PR ready for review" | Design team reviews PR |
+| Needs revision | Reviewer PR comments with concerns | Coordinator addresses comments |
+| Approved | All reviewers: "PR reviewed, approved" | Merge PR, create tasks |
+| Tasks created | Coordinator: "design complete, N tasks created" | Advance epic |
+| Escalated | Coordinator: "escalated to stakeholder" (3+ cycles) | User engages |
+| Needs re-decompose | Coordinator: "needs-redecompose: [reason]" | Back to decompose |
+
+**Circuit breaker:** After 3 PR review cycles without convergence,
+the coordinator adds `needs-stakeholder-input` and writes a summary
+of unresolved concerns. Ralph stops and the user resolves directly.
+
+**Outputs:**
+- Design doc(s) in `[DOCS_REPO]/docs/architecture/[epic-name]/` (merged PR)
+- ADRs in `[DOCS_REPO]/docs/architecture/decisions/`
+- API contracts, schema designs, UX specs as applicable
+- Task issues in component repos at `pipeline:implement`
+
+**Ralph integration:** Ralph picks up epics at `pipeline:design` in
+dependency order (Level 0 first). Each Ralph session: orchestrator
+dispatches coordinator, coordinator drives one epic through the full
+design cycle (assessment, team assembly, design production, PR review,
+task decomposition). Only if the circuit breaker triggers does Ralph
+stop for stakeholder input.
 
 ## Available Skills
 
 ### Pipeline
 - `/submit-prds` — bridge from manual discovery to pipeline (branch, PR, issue)
-- `/orchestrate` — pipeline orchestrator (reads state, dispatches agent teams for review + decompose stages)
+- `/orchestrate` — pipeline orchestrator (reads state, dispatches agent teams for review, decompose, and design stages)
 
 ### Utility
 - `/orient` — situational report (project state, issues, PRs, recommendations)
@@ -153,14 +205,26 @@ Only if the circuit breaker triggers does Ralph stop for stakeholder input.
 - `stakeholder-facilitator` — mediates between review findings and user
 
 ### Decompose Phase
-- `project-coordinator` — drives decomposition, synthesizes PM + architect input into roadmap
-- `product-manager` — product groupings, initiative themes, sign-off authority
-- `architect` — technical epics, dependency identification, ordering constraints
+- `project-coordinator` — drives decomposition, synthesizes PM + architect input into roadmap, manages PR review cycle
+- `product-manager` — product groupings, foundational product epics, initiative themes, PR review
+- `architect` — foundational design epics, infrastructure epics, dependency identification, PR review
+
+### Design Phase
+- `project-coordinator` — drives design process, assembles team, manages PR review cycle, task decomposition
+- `architect` — system design, cross-epic consistency, ADRs, codebase patterns
+- `spec-compliance` — PRD coverage (vertical) + cross-document consistency (horizontal) reviewer
+- `frontend-architect` — component architecture, state management, performance budgets (UI epics)
+- `ux-architect` — user flows, interaction design, accessibility (UX epics)
+- `engineer-dotnet` — .NET design + codebase review (if .NET repos involved)
+- `engineer-python` — Python design + codebase review (if Python repos involved)
+- `engineer-angular` — Angular/TS design + codebase review (if Angular repos involved)
+- `engineer-typescript` — TypeScript/Node.js design + codebase review (if Node/TS repos involved)
+- `database-engineer` — schema design, query patterns, migrations (if data concerns)
+- `devops-engineer` — CI/CD, deployment, monitoring (if infra concerns)
 
 ### Later Phases (not yet ported)
-- `ux-architect` — user flows, interaction design, accessibility
-- `engineer-*` — stack-specific implementation
-- `code-reviewer`, `security-reviewer`, `test-engineer`, `spec-compliance` — verify
+- `engineer-*` — stack-specific implementation (implement phase)
+- `code-reviewer`, `security-reviewer`, `test-engineer` — verify
 - `e2e-test-engineer`, `release-manager`, `tech-writer` — deliver
 
 ## State

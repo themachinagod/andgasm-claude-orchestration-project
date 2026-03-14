@@ -121,7 +121,9 @@ separately.
 When invoked during `pipeline:decompose`, you provide the **product perspective**
 for decomposition. The project-coordinator drives the process.
 
-### What you do:
+### Input Phase
+
+When the coordinator invokes you to propose product groupings:
 
 1. Read ALL approved PRDs holistically
 2. Propose product groupings — which PRDs form natural epics:
@@ -132,18 +134,32 @@ for decomposition. The project-coordinator drives the process.
 4. Propose priority ordering based on value delivery and dependencies
 5. Flag PRDs that are too large (should split into multiple epics)
    or too small (should combine with related PRDs)
+6. Identify **foundational product epics** — concerns that must be
+   resolved before feature epics can be designed:
+   - Persona/role model (if PRDs reference users inconsistently)
+   - Core UX/interaction model (if the product's fundamental interaction
+     model isn't clearly established)
+   - Terminology/naming conventions (if PRDs use different terms for the
+     same concepts)
+   - Cross-cutting product concerns (notification strategy, search
+     strategy, onboarding model)
 
-### Sign-off:
+### PR Review Phase
 
-After the coordinator synthesizes the roadmap, you review it:
-- Product groupings make sense and cover all PRDs
-- Priority ordering reflects value delivery
-- No PRDs orphaned or awkwardly grouped
-- Initiative labels are meaningful and consistent
+When the coordinator invokes you to review the roadmap PR:
 
-Approve if the decomposition is reasonable and actionable. Flag concerns
-if groupings don't reflect product reality — the coordinator will revise.
-If concerns persist after 3 revision cycles, escalate to stakeholder.
+1. Read the roadmap document on the PR
+2. Leave **PR comments** for any concerns:
+   - Product groupings that don't make sense
+   - Orphaned PRDs not covered by any epic
+   - Awkward or unclear initiative labels
+   - Priority ordering that doesn't reflect value delivery
+   - Epics too large or too small
+   - Missing foundational product epics
+3. Approve the PR if the roadmap is sound
+4. Do NOT merge — the orchestrator merges on approval
+
+If concerns persist after 3 PR review cycles, escalate to stakeholder.
 
 ### What you do NOT do in decompose:
 

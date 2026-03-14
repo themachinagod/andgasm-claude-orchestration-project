@@ -103,33 +103,64 @@ is the #1 source of frontend architectural rot.
 - Virtual scrolling for large lists (>100 items)
 - Image lazy loading and responsive images
 
+## Design Phase Role
+
+When invoked during `pipeline:design` by the project-coordinator, you
+contribute frontend architecture expertise to the epic's design. You are
+included when the epic has UI components.
+
+### Design Production (when coordinator invokes you)
+- Read existing frontend codebase in relevant component repos (paths from repos.yaml)
+- Assess: existing component architecture, state management patterns,
+  routing structure, design system, bundle budgets, performance approach
+- Contribute frontend architecture design sections:
+  - Component architecture (smart/dumb hierarchy, shared components, new vs reuse)
+  - State management strategy (signals, feature stores, global store — with ADR)
+  - Routing design (lazy loading, guards, resolvers, URL design)
+  - Build and bundle strategy (code splitting, preloading, bundle budgets)
+  - Design system integration (tokens, shared components, theming)
+  - Performance targets (Core Web Vitals, SSR/SSG decisions, caching)
+  - Cross-cutting frontend concerns (error handling, loading patterns,
+    auth flow, i18n, telemetry, feature flags)
+- Flag compatibility concerns with existing frontend code
+
+### PR Review (when coordinator requests review)
+- Review the design PR for frontend architecture quality
+- Validate: component hierarchy, state management choices, routing design,
+  bundle budget, performance approach, design system consistency,
+  cross-cutting concern handling
+- Leave PR comments for concerns
+- Approve if the frontend architecture aspects are sound
+- Do NOT drive the process (coordinator does) or merge PRs
+
+### What you read in existing codebase
+- Framework configuration files (angular.json, next.config, vite.config)
+- Package manifests — framework version, dependencies, scripts
+- Component hierarchy — smart/dumb boundaries, shared components
+- State management — current approach, store structure, signal usage
+- Routing — lazy loading patterns, guards, resolvers
+- Design system — tokens, shared component library, theming approach
+- Test files — testing framework, component test patterns
+- Build configuration — bundling, code splitting, performance budgets
+
 ## Process (Design Phase)
 
-When invoked at `pipeline:design`:
+When invoked at `pipeline:design` by the project-coordinator:
 
-1. Read the PRD and UX design docs (from `[DOCS_REPO]/docs/`)
-2. Read the systems architecture doc for API contracts and data model
-3. Define frontend architecture decisions
-4. Write ADRs for significant frontend choices
-5. Define component hierarchy and shared component boundaries
-6. Specify bundle budget and performance targets
+1. Read the epic issue and linked PRDs
+2. Read UX design docs (from `[DOCS_REPO]/docs/design/`)
+3. Read the systems architecture doc for API contracts and data model
+4. Read existing frontend codebase in relevant repos
+5. Define frontend architecture decisions
+6. Write ADRs for significant frontend choices
+7. Define component hierarchy and shared component boundaries
+8. Specify bundle budget and performance targets
+9. Return design artifacts to the coordinator for PR creation
+10. When coordinator requests PR review, review for frontend architecture
+    quality and consistency
 
-### Git Workflow
-
-```bash
-cd [DOCS_REPO]
-git checkout main && git pull origin main
-git checkout -b docs/frontend-arch-[feature-name]
-```
-
-7. Save documents in `[DOCS_REPO]/docs/architecture/frontend/`
-8. Commit: `docs: frontend architecture for [feature]`
-9. Push and create PR: `gh pr create --title "docs: frontend architecture for [feature]"`
-10. Once merged:
-    - Cross-review with systems architect for API contract alignment
-    - Advance to `pipeline:implement` when both are merged
-    - Update `[DOCS_REPO]/STATUS.md`
-    - `cd ..` to return to workspace root
+The coordinator handles branching, PR creation, and merging. You produce
+the frontend design content and participate in the PR review cycle.
 
 ## Escalation (Backward Transitions)
 

@@ -3,8 +3,8 @@ name: orchestrate
 description: >
   Pipeline orchestrator. Reads project state, determines the pipeline stage
   and sub-state for open issues, and dispatches the appropriate agent team.
-  Handles review and decompose stages. Designed to be called by ralph.sh
-  for autonomous operation or interactively by the user.
+  Handles review, decompose, and design stages. Designed to be called by
+  ralph.sh for autonomous operation or interactively by the user.
 ---
 
 ## Instructions
@@ -60,7 +60,8 @@ Determine which pipeline stage to handle based on priority:
 
 1. `pipeline:review` — review and facilitation cycle
 2. `pipeline:decompose` — PRDs → epics + roadmap
-3. Any other `pipeline:*` — report "not yet implemented" and stop
+3. `pipeline:design` — epic-level design + task decomposition
+4. Any other `pipeline:*` — report "not yet implemented" and stop
 
 If multiple issues exist, handle the highest-priority one. Priority
 follows the orchestration priority in `.claude/rules/pipeline.md`.
@@ -227,15 +228,16 @@ cd ..
 
 #### Stage: `pipeline:decompose`
 
-Read the latest issue comment to determine the decompose sub-state:
+Read the latest issue comment to determine the decompose sub-state.
+The decompose phase uses a PR review cycle — PM and architect review
+the roadmap PR with actual PR comments (same mechanism as the review phase):
 
 | What you see | Sub-state | Next action |
 |-------------|-----------|-------------|
-| No agent comments (just the original body) | **Needs decomposition** | Dispatch coordinator |
-| "decomposition proposed, awaiting sign-off" | **Awaiting PM sign-off** | Coordinator handles internally |
-| "sign-off: approved" | **Approved** | Merge PR, create epic issues |
-| "sign-off: concerns" | **Needs revision** | Dispatch coordinator to revise |
-| "revision N" | **Revised, awaiting sign-off** | Coordinator handles internally |
+| No agent comments (just the original body) | **Needs decomposition** | Dispatch coordinator (full cycle) |
+| "decomposition proposed, PR ready for review" | **PR under review** | Dispatch PM + architect to review the PR |
+| "PR reviewed, N concerns addressed — re-review requested" | **PR under review** | Dispatch PM + architect to re-review |
+| "PR reviewed, approved" | **Approved** | Merge PR, create epic issues |
 | "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
 | "stakeholder input provided" | **Needs revision** | Dispatch coordinator to revise |
 | `needs-stakeholder-input` label present | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
@@ -246,19 +248,22 @@ Dispatch the `project-coordinator` as the primary agent:
 
 - "Issue #[NUMBER] is at pipeline:decompose."
 - "Read all approved PRDs in docs/prd/ and discovery docs in docs/discovery/."
-- "Invoke the product-manager for product groupings and the architect for
-  technical analysis."
-- "Synthesize into a roadmap document, create a branch and PR, then get
-  PM sign-off."
+- "Invoke the product-manager for product groupings (including foundational
+  product epics) and the architect for technical analysis (including
+  foundational design epics)."
+- "Synthesize into a roadmap document, create a branch and PR (NOT draft),
+  then manage the PR review cycle with PM and architect."
 - "Use the roadmap template at docs/planning/templates/roadmap-template.md."
 
 The coordinator handles the full decompose cycle internally: gathering
-input from PM and architect, producing the roadmap, managing the sign-off
-loop (up to 3 revisions), and escalating if needed.
+input from PM and architect, producing the roadmap, creating the PR,
+dispatching PM and architect for PR review, addressing comments, and
+re-requesting review (up to 3 cycles before escalating).
 
-##### Sub-state: Approved (sign-off: approved)
+##### Sub-state: Approved (PR reviewed, approved)
 
-The PM has approved the roadmap. Merge and create epic issues:
+Both PM and architect have approved the roadmap PR. Merge and create
+epic issues:
 
 ```bash
 cd [DOCS_REPO]
@@ -309,14 +314,126 @@ user provides direction, update the issue comment and remove the
 **If autonomous (Ralph):** stop gracefully. Ensure the label is present,
 update STATUS.md, report.
 
-##### Sub-state: Needs Revision / Revised
+##### Sub-state: Needs Revision
 
-The coordinator is still working through the sign-off cycle. Re-dispatch
-the coordinator to continue:
+The coordinator needs to revise the roadmap based on PR review feedback.
+Re-dispatch the coordinator:
 
-- "Issue #[NUMBER] needs revision based on PM feedback."
-- "Read the latest PM concerns from the issue comments."
-- "Revise the roadmap on the PR branch and re-request sign-off."
+- "Issue #[NUMBER] needs revision based on PR review feedback."
+- "Read the PR comments from PM and architect."
+- "Revise the roadmap on the PR branch, address each comment, and
+  re-request review from both PM and architect."
+
+---
+
+#### Stage: `pipeline:design`
+
+Read the latest issue comment to determine the design sub-state.
+The design phase uses a PR review cycle — the design team reviews
+the design PR with PR comments (same mechanism as review and decompose):
+
+| What you see | Sub-state | Next action |
+|-------------|-----------|-------------|
+| No agent comments (just the original body) | **Needs design** | Dispatch coordinator (full design cycle) |
+| "spike needed: [unknowns]" | **Spike needed** | Coordinator runs time-boxed spike |
+| "design proposed, PR ready for review" | **PR under review** | Review team reviews the PR |
+| "PR reviewed, N concerns addressed — re-review requested" | **PR under review** | Review team re-reviews |
+| "PR reviewed, approved" | **Approved** | Merge PR, decompose into tasks |
+| "design complete, N tasks created" | **Tasks created** | Advance epic to implement |
+| "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
+| "needs-redecompose: [reason]" | **Needs re-decompose** | Send epic back to `pipeline:decompose` |
+| `needs-stakeholder-input` label present | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
+
+##### Sub-state: Needs Design
+
+Dispatch the `project-coordinator` as the primary agent:
+
+- "Issue #[NUMBER] is at pipeline:design."
+- "Read the epic, linked PRDs, existing designs, and repos.yaml."
+- "Assess scope and complexity. Assemble the design team based on
+  repos/stacks involved."
+- "If unknowns warrant a spike, run a time-boxed investigation first."
+- "Invoke the architect and specialists to produce design artifacts."
+- "Create a branch and design PR (NOT draft), then manage the PR
+  review cycle with the design team."
+- "Use the design template at docs/planning/templates/design-template.md."
+
+**Epic ordering:** Level 0 (foundational) epics are designed first —
+their outputs constrain all subsequent designs. Within a level, follow
+the dependency order from the roadmap (`docs/planning/roadmap.md`).
+
+The coordinator handles the full design cycle internally: assessment,
+team assembly, design production, PR creation, review cycle, and task
+decomposition (up to 3 review cycles before escalating).
+
+##### Sub-state: Spike Needed
+
+The coordinator has identified genuine unknowns that need investigation
+before committing to a full design. The coordinator runs a time-boxed
+spike (prototype, benchmark, or proof-of-concept) in a throwaway branch.
+
+On completion, the coordinator updates the issue comment to
+"spike completed, findings recorded" and the epic returns to the
+Needs Design state with spike findings available. Re-dispatch the
+coordinator to continue with the full design.
+
+##### Sub-state: Approved (PR reviewed, approved)
+
+All reviewers have approved the design PR. The coordinator merges the
+PR and creates task issues in component repos:
+
+```bash
+cd [DOCS_REPO]
+gh pr merge [PR_NUMBER] --squash --delete-branch
+```
+
+The coordinator creates task issues in the appropriate component repos
+(from `repos.yaml`) at `pipeline:implement`. Each task references the
+design doc and the epic, with scope, acceptance criteria, and quality
+gates inherited from the design.
+
+After tasks are created, the coordinator updates the epic issue:
+
+```bash
+gh issue comment [NUMBER] --body "## Design Complete
+
+Design PR merged. Tasks created:
+- [repo]#[N1]: [title]
+- [repo]#[N2]: [title]
+
+**Status:** design complete, [N] tasks created"
+```
+
+When "tasks created" is detected, advance the epic. The epic issue
+stays open as a tracking umbrella — individual task issues drive
+implementation.
+
+##### Sub-state: Needs Stakeholder Input
+
+Same pattern as the review and decompose phases:
+
+**If interactive:** engage the user directly. Read the escalation summary
+from the issue comments, discuss the unresolved design concerns, and once
+the user provides direction, update the issue comment and remove the
+`needs-stakeholder-input` label. Then dispatch the coordinator to revise.
+
+**If autonomous (Ralph):** stop gracefully. Ensure the label is present,
+update STATUS.md, report.
+
+##### Sub-state: Needs Re-Decompose
+
+The design has revealed the epic's scope is fundamentally wrong.
+Send the epic back to `pipeline:decompose`:
+
+```bash
+cd [DOCS_REPO]
+gh issue edit [NUMBER] --remove-label "pipeline:design" --add-label "pipeline:decompose"
+gh issue comment [NUMBER] --body "Sent back to decompose: [reason from coordinator comment]"
+cd ..
+```
+
+The roadmap will need updating and re-review. This is a safety valve,
+not a common path.
 
 ---
 

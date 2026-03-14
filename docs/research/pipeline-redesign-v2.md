@@ -1,7 +1,7 @@
 # Pipeline Redesign v2
 
 > Phase-by-phase design. Nailing each phase before moving on.
-> Currently focused on: **Setup + Phase 0 + Phase 1**
+> Currently focused on: **Setup + Phase 0 + Phase 1 + Phase 2 + Phase 3**
 > Goal: get these solid enough to test in Claude before proceeding.
 >
 > **Implementation status:**
@@ -9,7 +9,8 @@
 > - Phase 0 (Discovery — manual): BUILT (user writes PRDs + `/submit-prds`)
 > - Phase 1 (Review Loop): BUILT (review team + stakeholder facilitator + ralph.sh)
 > - Phase 2 (Decompose): BUILT (coordinator + PM + architect team, unified orchestrator)
-> - Phase 3+ (Design, Implement, Verify, Deliver): DESIGN ONLY
+> - Phase 3 (Design): DESIGNED (research doc detailed, not yet built)
+> - Phase 4+ (Implement, Verify, Deliver): ROUGH NOTES ONLY
 
 ---
 
@@ -26,7 +27,7 @@ flowchart LR
     VER --> DEL["Deliver"]
 ```
 
-**Currently designing:** Setup → Discovery → Review → Decompose.
+**Currently designing:** Setup → Discovery → Review → Decompose → Design (all detailed above).
 
 ---
 
@@ -343,9 +344,9 @@ On re-review:
 
 ---
 
-## End-to-End: Setup Through Review
+## End-to-End: Review
 
-Full walkthrough from empty directory to reviewed PRDs.
+Full walkthrough from PRD submission to approved, merged PRDs.
 
 ```mermaid
 sequenceDiagram
@@ -356,18 +357,7 @@ sequenceDiagram
     participant SF as Stakeholder Facilitator
     participant GH as GitHub
 
-    Note over U: SETUP
-    U->>U: mkdir my-project && cd my-project
-    U->>U: /initialise-workspace
-    Note over FS: Workspace created with docs repo,<br/>.claude/, CLAUDE.md
-
-    Note over U: DISCOVERY (manual, days/weeks)
-    U->>FS: Writes vision doc in docs/discovery/
-    U->>FS: Writes PRD-001, PRD-002, PRD-003 in docs/prd/
-    Note over U: Iterates with AI help until satisfied
-
-    Note over U: SUBMIT
-    U->>U: /submit-prds
+    Note over U: User runs /submit-prds
     Note over GH: Branch created, PR created,<br/>Issue created at pipeline:review
 
     Note over O: RALPH TAKES OVER
@@ -426,55 +416,51 @@ sequenceDiagram
 
 ---
 
-## Notes for Later Phases
-
-> Rough notes. Each phase gets detailed treatment when we get to it.
-
-### Phase 2: Decompose
+## Phase 2: Decompose
 
 After review completes, the approved PRDs need to be grouped into epics
 and sequenced into a product roadmap. This is product-level planning —
 not implementation-level task breakdown (that happens during Design).
 
-#### Inputs
+### Inputs
 
 - Approved PRDs in `docs/prd/` (merged from review phase)
 - Discovery docs in `docs/discovery/`
 - Issue at `pipeline:decompose` (created when review merges)
 
-#### Decomposition Team
+### Decomposition Team
 
 | Agent | Role | What they contribute |
 |-------|------|---------------------|
-| project-coordinator (primary) | Drives the process | Invokes PM + architect, synthesizes roadmap, manages sign-off |
-| product-manager | Product grouping | Which PRDs form natural epics, initiative themes, priority ordering |
-| architect | Technical analysis | Technical epics (infra, auth, shared libs), dependency constraints |
+| project-coordinator (primary) | Drives the process | Invokes PM + architect, synthesizes roadmap, manages PR review cycle |
+| product-manager | Product grouping + PR review | Product groupings, foundational product epics, initiative themes, PR review |
+| architect | Technical analysis + PR review | Foundational design epics, infrastructure epics, dependency constraints, PR review |
 
 The coordinator is the primary agent — it invokes PM and architect as
 sub-agents, synthesizes their perspectives into a roadmap, and manages
 the sign-off cycle.
 
-#### The Flow
+### The Flow
 
 ```mermaid
 flowchart LR
     DETECT["Orchestrator detects<br/>pipeline:decompose"]
     COORD["Coordinator invokes<br/>PM + Architect"]
     SYNTH["Coordinator synthesizes<br/>roadmap document"]
-    PR["Branch + PR<br/>with roadmap"]
-    SIGNOFF{"PM<br/>sign-off?"}
+    PR["Branch + PR<br/>(NOT draft)"]
+    PRREVIEW{"PM + Architect<br/>PR review?"}
     MERGE["Merge PR"]
     EPICS["Create epic issues<br/>at pipeline:design"]
-    REVISE["Coordinator<br/>revises"]
+    REVISE["Coordinator addresses<br/>PR comments"]
     ESCALATE["Escalate to<br/>stakeholder"]
 
-    DETECT --> COORD --> SYNTH --> PR --> SIGNOFF
-    SIGNOFF -->|"approved"| MERGE --> EPICS
-    SIGNOFF -->|"concerns"| REVISE --> SIGNOFF
-    SIGNOFF -->|"3+ cycles"| ESCALATE
+    DETECT --> COORD --> SYNTH --> PR --> PRREVIEW
+    PRREVIEW -->|"both approve"| MERGE --> EPICS
+    PRREVIEW -->|"concerns"| REVISE --> PRREVIEW
+    PRREVIEW -->|"3+ cycles"| ESCALATE
 ```
 
-#### Sub-State Machine
+### Sub-State Machine
 
 The issue stays at `pipeline:decompose` throughout. Sub-state tracked
 via issue comments:
@@ -482,59 +468,86 @@ via issue comments:
 ```mermaid
 stateDiagram-v2
     [*] --> NeedsDecomposition : Issue created
-    NeedsDecomposition --> ProposalReady : Coordinator produces roadmap
-    ProposalReady --> Approved : PM approves
-    ProposalReady --> NeedsRevision : PM flags concerns
-    NeedsRevision --> ProposalReady : Coordinator revises
-    NeedsRevision --> NeedsStakeholder : 3+ revision cycles
-    NeedsStakeholder --> ProposalReady : Stakeholder resolves
+    NeedsDecomposition --> PRUnderReview : Coordinator produces roadmap + PR
+    PRUnderReview --> Approved : PM + architect approve PR
+    PRUnderReview --> NeedsRevision : PR comments with concerns
+    NeedsRevision --> PRUnderReview : Coordinator addresses + re-review
+    NeedsRevision --> NeedsStakeholder : 3+ review cycles
+    NeedsStakeholder --> PRUnderReview : Stakeholder resolves
     Approved --> [*] : Merge and create epics
 ```
 
 | Orchestrator reads | Sub-state | Action |
 |---|---|---|
-| No agent comments | Needs decomposition | Dispatch coordinator |
-| "decomposition proposed, awaiting sign-off" | Proposal ready | Coordinator handles PM sign-off internally |
-| "sign-off: approved" | Approved | Merge PR, create epic issues |
-| "sign-off: concerns" | Needs revision | Coordinator revises |
+| No agent comments | Needs decomposition | Dispatch coordinator (full cycle) |
+| "decomposition proposed, PR ready for review" | PR under review | PM + architect review the PR |
+| "PR reviewed, N concerns" | Needs revision | Coordinator addresses PR comments |
+| "PR reviewed, approved" | Approved | Merge PR, create epic issues |
 | "escalated to stakeholder" | Needs stakeholder | Ralph stops / user engages |
 
-#### PM Sign-Off
+### PR Review Cycle
 
-The product-manager reviews the complete roadmap and either approves or
-flags concerns. This is an internal team cycle — mostly autonomous. The
-PM checks:
+PM and architect review the roadmap PR with actual PR comments — the
+same traceable mechanism as the review phase. The coordinator addresses
+concerns on the branch and requests re-review. Both PM and architect
+must approve the PR for it to merge. This is autonomous — no stakeholder
+involvement unless the circuit breaker triggers.
+
+**PM reviews for:**
 - Product groupings cover all PRDs (no orphans)
 - Priority ordering reflects value delivery
 - Initiative labels are meaningful
 - Groupings are right-sized (not too large, not too small)
+- Foundational product epics are identified where needed
 
-#### Circuit Breaker
+**Architect reviews for:**
+- Foundational design epics are complete (data model, auth, API conventions)
+- Infrastructure epics are identified
+- Dependency ordering is correct
+- Complexity risks are flagged
 
-After 3 internal revision cycles (PM flags concerns, coordinator revises,
-PM still has concerns), the coordinator escalates to the stakeholder:
+### Foundational Epics (Level 0)
+
+During decomposition, both PM and architect identify foundational epics
+that must complete design before feature epics can begin their design
+phase. These go at Level 0 in the dependency order.
+
+| Source | Category | Examples |
+|--------|----------|----------|
+| Architect | Foundational technical design | Holistic data model, auth/identity model, API conventions, event/messaging model |
+| Architect | Infrastructure | CI/CD, deployment, monitoring, shared tooling |
+| PM | Foundational product design | Persona/role model, core UX model, terminology/naming, cross-cutting product concerns (notifications, search, onboarding) |
+
+### Circuit Breaker
+
+After 3 PR review cycles (PM/architect flag concerns, coordinator
+revises, reviewers still have concerns), the coordinator escalates to
+the stakeholder:
 - Adds `needs-stakeholder-input` label
 - Writes a clear summary of unresolved concerns
 - Ralph stops; user starts interactive Claude session to resolve
 
-#### Initiatives
+### Initiatives
 
 Initiative labels are thematic groupings applied to epic issues for
 context (e.g., `initiative:auth`, `initiative:reporting`). Created
 dynamically by the coordinator during decomposition, not pre-defined.
 They group related epics across the roadmap.
 
-#### What the Roadmap Contains
+### What the Roadmap Contains
 
 Template at `docs/planning/templates/roadmap-template.md`:
 - **Initiatives** — thematic labels and descriptions
+- **Foundational epics (Level 0)** — from both PM and architect, must be
+  designed before feature epics (data model, persona model, etc.)
 - **Product epics** — grouped from PRDs, with source PRD refs, scope,
   acceptance criteria, dependencies
-- **Technical epics** — identified by architect (not from PRDs)
-- **Dependency order** — sequenced levels noting what blocks what
+- **Technical/infrastructure epics** — identified by architect (not from PRDs)
+- **Dependency order** — Level 0 first, then sequenced levels noting
+  what blocks what
 - **Cross-cutting concerns** — things spanning multiple epics
 
-#### Epic Issue Creation
+### Epic Issue Creation
 
 On approval, the orchestrator creates epic issues using the epic issue
 template. Each epic gets:
@@ -543,7 +556,7 @@ template. Each epic gets:
   dependencies
 - The decompose issue itself is closed with `pipeline:done`
 
-#### Outputs
+### Outputs
 
 | Output | Location |
 |--------|----------|
@@ -552,20 +565,544 @@ template. Each epic gets:
 | Initiative labels | Applied to epic issues |
 | STATUS.md update | Current state reflects decomposition results |
 
-#### Ralph Integration
+### Ralph Integration
 
-Ralph runs the decomposition autonomously. The PM sign-off happens
-within the same Ralph session (no user involvement in the normal case).
-Only the circuit breaker (3+ revision cycles) causes Ralph to stop.
+Ralph runs the decomposition autonomously. The PR review cycle (PM +
+architect reviewing with PR comments, coordinator addressing them)
+happens within the same Ralph session (no user involvement in the
+normal case). Only the circuit breaker (3+ review cycles) causes
+Ralph to stop.
 
 This is different from the review phase where Ralph always stops for
 stakeholder facilitation. Decomposition is mostly autonomous — the team
-works, PM signs off, and epic issues are created without user intervention.
+works, PM and architect review the PR, and epic issues are created
+without user intervention.
 
-### Phase 3: Design (per epic)
-- Orchestrator assesses epic → assembles team → sub-agents produce design
-- Decomposes epic into tasks → task issues at `pipeline:implement`
-- PR + review gate
+---
+
+## End-to-End: Decompose
+
+Full walkthrough from approved PRDs to epic issues ready for design.
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator (Ralph)
+    participant C as Project Coordinator
+    participant PM as Product Manager
+    participant A as Architect
+    participant FS as File System
+    participant GH as GitHub
+
+    Note over O: RALPH SESSION — Decompose
+
+    O->>O: Orient — sees issue at pipeline:decompose
+    O->>C: Dispatches coordinator (full cycle)
+
+    Note over C,A: PHASE A — Input Gathering
+    C->>FS: Reads all PRDs + discovery docs + repos.yaml
+    C->>PM: Propose product groupings + foundational product epics
+    PM->>C: Groupings, initiatives, priorities,<br/>foundational product epics (persona model, UX model)
+    C->>A: Identify foundational design epics,<br/>infra epics, dependencies
+    A->>C: Foundational epics (data model, auth model),<br/>infra epics, dependency constraints
+
+    Note over C: PHASE B — Synthesis
+    C->>FS: Synthesizes roadmap using template
+    C->>GH: Branch + PR (NOT draft)
+    C->>GH: Issue comment: "decomposition proposed,<br/>PR ready for review"
+
+    Note over C,A: PHASE C — PR Review Cycle
+    C->>PM: Review roadmap PR
+    PM->>GH: PR comments: groupings, coverage,<br/>foundational product epics
+    C->>A: Review roadmap PR
+    A->>GH: PR comments: dependencies, foundational<br/>design epics, complexity
+
+    alt Both approve (no concerns)
+        PM->>GH: Approves PR
+        A->>GH: Approves PR
+        C->>GH: Issue comment: "PR reviewed, approved"
+    else Concerns raised
+        C->>FS: Addresses PR comments on branch
+        C->>GH: Pushes revisions, replies to comments
+        C->>GH: Issue comment: "PR reviewed,<br/>N concerns addressed — re-review requested"
+        C->>PM: Re-review roadmap PR
+        C->>A: Re-review roadmap PR
+        Note over C: Repeats until approved or 3+ cycles
+    else 3+ cycles without convergence
+        C->>GH: Issue comment: "escalated to stakeholder"
+        C->>GH: Adds needs-stakeholder-input label
+        Note over O: Ralph stops — user engages
+    end
+
+    Note over O: PHASE D — Epic Creation (on approval)
+    O->>GH: Merges roadmap PR
+    O->>GH: Creates epic issues at pipeline:design<br/>with initiative labels
+    O->>GH: Closes decompose issue (pipeline:done)
+    O->>FS: Updates STATUS.md
+    Note over O: Decompose complete — epics ready for design
+```
+
+---
+
+## Phase 3: Design (per epic)
+
+After decomposition, each epic at `pipeline:design` needs a full technical
+design before implementation begins. Level 0 (foundational) epics are
+designed first — their outputs constrain all subsequent designs.
+
+### Inputs
+
+- Epic issue at `pipeline:design` (created during decompose)
+- Linked PRDs in `docs/prd/`
+- Roadmap in `docs/planning/roadmap.md` (dependency ordering)
+- Existing designs in `docs/architecture/` and `docs/design/` (Level 0
+  designs and any previously completed epic designs)
+- `repos.yaml` — repo topology, stacks, dependencies
+- **Existing codebase** — component repos listed in `repos.yaml`. The
+  design team must read and understand existing code: patterns,
+  conventions, APIs, schemas, dependencies, and technical debt. Designs
+  must integrate with reality, not just documents.
+
+### Who Drives Design
+
+The **project-coordinator** drives the Design phase, same as Decompose.
+The orchestrator dispatches the coordinator; the coordinator choreographs
+the specialist team. This keeps the orchestrator thin — it reads state
+and dispatches, while the coordinator manages the multi-agent collaboration.
+
+```
+Orchestrator → dispatches Coordinator
+  Coordinator → assesses epic, assembles team
+  Coordinator → invokes Architect (produces design)
+  Coordinator → invokes Specialists (contribute stack-specific design)
+  Coordinator → creates PR
+  Coordinator → invokes reviewers (architect, spec-compliance, specialists)
+  Coordinator → addresses review comments, manages review cycle
+  Coordinator → on approval: merges, decomposes into tasks
+```
+
+### Design Team (dynamic per epic)
+
+The coordinator assembles the team dynamically based on what the epic
+touches. Two agents are always present; the rest are determined by the
+epic's scope and the stacks in `repos.yaml`.
+
+| Agent | When | Role |
+|-------|------|------|
+| project-coordinator | Always | Drives the process, assembles team, manages PR review cycle, task decomposition |
+| architect | Always | System design, cross-epic consistency, ADRs, integration, codebase patterns |
+| spec-compliance | If epic has PRD linkage | PRD coverage (vertical) + cross-document consistency (horizontal) |
+| frontend-architect | If epic has UI | Component architecture, state management, performance budgets |
+| ux-architect | If epic has UX | User flows, interaction design, accessibility |
+| engineer-dotnet | If epic touches .NET repos | .NET design + codebase review |
+| engineer-python | If epic touches Python repos | Python design + codebase review |
+| engineer-angular | If epic touches Angular/TS repos | Angular/TS design + codebase review |
+| engineer-typescript | If epic touches Node/TS repos | Node/TS design + codebase review |
+| database-engineer | If epic has data concerns | Schema design, query patterns, migrations |
+| devops-engineer | If epic has infra concerns | CI/CD, deployment, monitoring |
+
+Team selection: coordinator reads epic scope → determines repos involved
+→ checks `repos.yaml` stack info → selects matching specialists.
+
+**Lightweight path:** Not every epic needs the full team. A Level 0
+"API conventions" epic may only need the architect. A small infra epic
+may need architect + devops-engineer. The coordinator assesses the epic's
+scope and complexity and assembles the minimum viable team. Architect
+is always present; spec-compliance is present for any epic that touches
+PRD requirements (skippable for pure infrastructure/convention epics
+with no PRD linkage).
+
+### Ordering — Level 0 First
+
+- Level 0 (foundational) epics from the roadmap are designed first
+- Their outputs (data model doc, auth model doc, API conventions doc,
+  UX model doc) become constraints for all subsequent designs
+- Feature epics designed in dependency order from the roadmap
+- Within a level: epics are independent and *could* parallelize, but
+  Ralph runs sequentially (one session = one epic). Parallel design
+  would require multiple Ralph instances or manual parallel sessions —
+  a future optimisation, not the default.
+- If a feature epic design reveals a gap in a Level 0 design →
+  backward transition (amendment issue)
+
+### The Flow
+
+```mermaid
+flowchart LR
+    Pick["Orchestrator picks<br/>highest-priority epic"]
+    Dispatch["Dispatches<br/>coordinator"]
+    Assess["Coordinator reads epic +<br/>PRDs + designs + codebase"]
+    Spike{"Unknowns?"}
+    RunSpike["Time-boxed spike<br/>(ADR/report)"]
+    Team["Assembles design team<br/>from repos.yaml stacks"]
+    Design["Team produces<br/>design artifacts"]
+    PR["Branch + PR<br/>(NOT draft)"]
+    Review{"PR review<br/>by team?"}
+    Tasks["Coordinator decomposes<br/>into tasks (same session)"]
+    Revise["Coordinator addresses<br/>PR comments"]
+    Redecompose["Back to<br/>pipeline:decompose"]
+    Escalate["Escalate to<br/>stakeholder"]
+
+    Pick --> Dispatch --> Assess --> Spike
+    Spike -->|"yes"| RunSpike --> Team
+    Spike -->|"no"| Team
+    Team --> Design --> PR --> Review
+    Review -->|"all approve"| Tasks
+    Review -->|"concerns"| Revise --> Review
+    Review -->|"scope wrong"| Redecompose
+    Review -->|"3+ cycles"| Escalate
+```
+
+### Design Spikes
+
+Some epics involve genuine uncertainty — technology choices, performance
+characteristics, or integration approaches that can't be resolved on
+paper. The coordinator can recognise this and call for a **design spike**
+before committing to a full design:
+
+- Coordinator assesses epic and identifies specific uncertainties
+- Spike is a time-boxed investigation: prototype, benchmark, or proof-of-concept
+- Spike produces findings documented as an ADR or spike report
+- Findings feed into the full design — the spike resolves unknowns
+  before the team commits design effort
+- Spike work happens in a throwaway branch (not production code)
+
+This avoids the trap of designing in the abstract when practical
+experience is needed. The coordinator decides whether a spike is needed
+based on the number and nature of unknowns in the epic.
+
+### Cross-Epic Consistency
+
+Every design must fit into the platform as a whole:
+
+- **Architect is the consistency thread** — present in every design
+  review, maintains the holistic view across all epics
+- **Spec-compliance checks horizontal consistency** — terminology,
+  data model alignment, API convention conformance, UX patterns,
+  integration assumptions across all existing designs and docs
+- **Every design review explicitly checks:**
+  - Conforms to Level 0 foundational designs (data model, API
+    conventions, auth model, UX model)
+  - Doesn't conflict with other epic designs already merged
+  - Shared concerns (logging, error handling, config) are consistent
+  - Integration points between epics are compatible
+- **Backward transitions**: if a design reveals an inconsistency with
+  another design, the coordinator raises an **amendment issue** — a new
+  GitHub issue in the docs repo with label `type:amendment`, referencing
+  the affected design/PRD and describing the inconsistency. The amendment
+  issue enters the pipeline at `pipeline:design` (for design fixes) or
+  `pipeline:review` (for PRD fixes) and follows the same PR review cycle.
+  This is a lightweight corrective path, not a full re-design.
+
+### Codebase Awareness
+
+Designs must be grounded in the reality of the existing codebase, not
+produced in a document vacuum. Whether the project is greenfield,
+extending existing systems, or adding features to established code,
+the design team must understand what already exists.
+
+- **Read existing code**: architect and specialists read the relevant
+  component repos (paths from `repos.yaml`) before designing. Specifically:
+  - **Project structure**: directory layout, module organisation
+  - **Entry points and routing**: how requests flow through the system
+  - **Data models/entities**: existing schemas, relationships, migrations
+  - **Service layer**: existing services, their interfaces, dependency injection patterns
+  - **API surface**: existing endpoints, contracts, versioning
+  - **Auth/authz**: how authentication and authorization are implemented
+  - **Config and environment**: how configuration is managed
+  - **Test structure**: testing frameworks, fixture patterns, coverage approach
+  - **CI/CD**: build scripts, deployment configs, pipeline definitions
+  - **Dependency manifests**: package.json, .csproj, requirements.txt — current versions
+  The coordinator ensures the team reads the right repos for the epic's scope,
+  not the entire codebase. Focus on the layers the epic will touch.
+- **Reuse over reinvent**: if a capability already exists in the
+  codebase (a utility, a pattern, a service), the design should
+  reference and reuse it rather than designing a new one.
+- **Compatibility**: new designs must be compatible with existing APIs,
+  data schemas, auth flows, and deployment infrastructure. Breaking
+  changes require explicit ADRs with migration plans.
+- **Pattern consistency**: if the codebase uses repository pattern for
+  data access, or a specific error handling convention, or a particular
+  testing framework — the design should follow those patterns unless
+  there's a documented reason to diverge (ADR).
+- **Tech debt awareness**: designs should acknowledge existing tech debt
+  that affects the epic's scope. If the design works around debt,
+  document it. If it proposes fixing debt, include it in the scope.
+- **Dependency alignment**: designs should align with existing framework
+  and package versions. Proposing new dependencies requires rationale.
+- **Greenfield caveat**: for new projects, earlier Level 0 designs and
+  any code produced from them become the "existing codebase" that
+  subsequent designs must be aware of.
+
+The specialist agents (engineer-dotnet, engineer-python, etc.) are
+particularly valuable here — they bring stack-specific knowledge of
+the codebase's existing patterns and conventions.
+
+### PRD Traceability
+
+Every design must trace back to the source PRDs — both the 1000-yard
+view (does this fit the product as a whole?) and the detail view (does
+this address every requirement?).
+
+- **Design docs explicitly cite PRD requirements**: not just "Source:
+  PRD-002" but "this component addresses PRD-002 Section 3.2
+  (real-time notifications)" — so a reader can verify coverage
+- **Requirements coverage check during review**: spec-compliance agent
+  verifies every requirement from the epic's linked PRDs has a design
+  answer. No orphaned requirements. No design elements without a PRD
+  justification.
+- **Cross-document consistency check during review**: spec-compliance
+  also verifies terminology, data model alignment, API convention
+  conformance, UX pattern consistency, and integration assumptions
+  across all existing designs and docs. Flags contradictions between
+  this design and any other project artifact.
+- **Traceability chain**: PRD → Epic (roadmap) → Design (architecture
+  doc) → Tasks (component repo issues). Every link in the chain
+  references the one above it.
+- **If a design reveals PRD gaps**: coordinator raises an amendment
+  issue (label `type:amendment`) targeting the PRD, entering the
+  pipeline at `pipeline:review`. Same mechanism as cross-epic
+  consistency amendments.
+
+```
+PRD-NNN (requirement)
+  → EPIC-NNN (groups requirements, references source PRDs)
+    → Design doc (addresses each requirement, references PRDs + epic)
+      → Task issue (implements part of design, references design doc + epic)
+```
+
+### Design Artifacts (per epic)
+
+- Architecture doc in `docs/architecture/[epic-name]/`
+  - Must include a **Requirements Traceability** section mapping PRD
+    requirements to design elements
+- ADRs in `docs/architecture/decisions/` (for significant decisions)
+- API contracts (OpenAPI) in `docs/design/api/` if applicable
+- Schema designs in `docs/design/schema/` if applicable
+- UX specs in `docs/design/ux/` if applicable
+
+**TODO:** Create a design doc template in `docs/planning/templates/`
+(similar to `roadmap-template.md`). The template should have sections
+for: context/scope, requirements traceability, system design, API
+contracts (if applicable), data design (if applicable), cross-epic
+integration notes, quality gates, and open questions/ADRs.
+
+### Sub-State Machine
+
+The epic issue stays at `pipeline:design` throughout. Sub-state tracked
+via issue comments:
+
+```mermaid
+stateDiagram-v2
+    [*] --> NeedsDesign : Epic at pipeline design
+    NeedsDesign --> SpikeNeeded : Coordinator identifies unknowns
+    SpikeNeeded --> NeedsDesign : Spike completed, findings recorded
+    NeedsDesign --> PRUnderReview : Coordinator + team produce design + PR
+    PRUnderReview --> Approved : All reviewers approve PR
+    PRUnderReview --> NeedsRevision : PR comments with concerns
+    NeedsRevision --> PRUnderReview : Coordinator addresses + re-review
+    NeedsRevision --> NeedsStakeholder : 3+ review cycles
+    NeedsRevision --> NeedsRedecompose : Design reveals epic scope is wrong
+    NeedsStakeholder --> PRUnderReview : Stakeholder resolves
+    NeedsRedecompose --> [*] : Epic sent back to Decompose
+    Approved --> TasksCreated : Design merged + tasks decomposed
+    TasksCreated --> [*] : Epic advances to implement
+```
+
+**Backward transitions:** If during design or review the team discovers
+the epic's scope is fundamentally wrong — missing concerns, overlapping
+with another epic, or needs splitting — the coordinator can send the
+epic back to `pipeline:decompose` with a comment explaining why. This
+is a safety valve, not a common path. The roadmap would need updating
+and re-review. The coordinator adds an issue comment with
+`"needs-redecompose: [reason]"` and the orchestrator picks it up.
+
+| Orchestrator reads | Sub-state | Action |
+|---|---|---|
+| No agent comments | Needs design | Dispatch coordinator to assess + assemble team |
+| "spike needed: [unknowns]" | Spike needed | Coordinator runs time-boxed spike |
+| "design proposed, PR ready for review" | PR under review | Review team reviews the PR |
+| "PR reviewed, N concerns" | Needs revision | Coordinator addresses PR comments |
+| "PR reviewed, approved" | Approved | Merge PR, decompose into tasks |
+| "tasks created" | Tasks created | Advance epic, create task issues |
+| "escalated to stakeholder" | Needs stakeholder | Ralph stops / user engages |
+| "needs-redecompose: [reason]" | Needs re-decompose | Send epic back to `pipeline:decompose` |
+
+### PR Review Cycle
+
+Same mechanism as Review and Decompose phases:
+
+- Design PR created (NOT draft)
+- Coordinator requests reviews from the team
+- Review team leaves PR comments:
+  - **Architect**: architectural quality, cross-epic integration,
+    pattern consistency
+  - **Spec-compliance**: PRD coverage, cross-document consistency,
+    terminology, model alignment
+  - **Specialists**: stack-specific technical correctness
+- Coordinator addresses comments on the branch (with architect input
+  for architectural concerns, specialist input for stack concerns)
+- Re-review until all approve or circuit breaker triggers
+- Circuit breaker at 3 review cycles → escalate to stakeholder
+
+### Task Decomposition (within design phase)
+
+After the design PR is approved and merged, the **coordinator** decomposes
+the epic into implementation tasks — in the same session, not deferred.
+The design session's context (team, codebase understanding, design
+decisions) is fresh and valuable; deferring decomposition to a separate
+session wastes it.
+
+Flow: design PR merges → coordinator immediately decomposes → task
+issues created → epic label advanced to `pipeline:implement`.
+
+- Each task → issue in the appropriate component repo (from `repos.yaml`)
+- Tasks reference the design doc and the epic
+- Each task has: scope, acceptance criteria, quality gates (from the
+  design's quality gates section)
+- Shared tasks across epics identified and either:
+  - Assigned to the first epic that needs them (dependencies noted)
+  - Or tracked as cross-cutting tasks with their own epic reference
+- Task issues created at `pipeline:implement`
+
+### Quality Gates
+
+Defined during design by the architect + relevant specialists. Each
+epic's design doc must include a quality gates section that specifies
+the concrete, measurable criteria for the epic:
+
+**Code quality gates** (enforced in CI/CD during Implement/Verify):
+- Test coverage targets (unit %, integration %, e.g. ≥80% unit)
+- Linting and static analysis rules (language-specific)
+- API contract validation (OpenAPI schema conformance checks)
+- Build and compilation (zero warnings policy, or explicit exceptions)
+
+**Non-functional gates** (validated during Verify):
+- Performance budgets (response time P95, throughput targets)
+- Accessibility requirements (WCAG level, auditing tool)
+- Security requirements (auth model, data handling, OWASP checks)
+- Browser/platform support (if applicable)
+
+**Design-level gates** (enforced during design PR review):
+- Requirements traceability complete (spec-compliance validates)
+- Cross-epic consistency verified (architect validates)
+- Codebase compatibility confirmed (specialists validate)
+- No unresolved open questions
+
+These flow down to task-level acceptance criteria. When the coordinator
+decomposes into tasks, each task inherits the relevant subset of gates.
+The Verify phase enforces code-level gates; the spec-review phase
+validates non-functional gates against the design's stated targets.
+
+### Outputs
+
+| Output | Location |
+|--------|----------|
+| Architecture doc | `docs/architecture/[epic-name]/` (merged PR) |
+| ADRs | `docs/architecture/decisions/` |
+| Spike reports | `docs/architecture/decisions/` (if spike was run) |
+| API contracts | `docs/design/api/` (if applicable) |
+| Schema designs | `docs/design/schema/` (if applicable) |
+| UX specs | `docs/design/ux/` (if applicable) |
+| Task issues | Component repo GitHub Issues at `pipeline:implement` |
+| Epic status | Epic issue updated, tasks linked |
+
+### Spec-Compliance: Reviewer, Not Producer
+
+A deliberate design choice: spec-compliance is a **reviewer**, not a
+design producer. It does not write design content. It reviews what the
+architect and specialists produce and validates:
+
+- **Vertical coverage**: every PRD requirement is addressed somewhere
+  in the design (nothing dropped)
+- **Horizontal consistency**: terminology, data models, API conventions,
+  and UX patterns are consistent across this design and all other
+  project documents
+
+This separation of concerns avoids conflating "design the system" with
+"check the design covers requirements." The architect makes design
+decisions; spec-compliance holds them accountable to the PRD. If
+spec-compliance finds gaps, it leaves PR comments — the architect fixes.
+
+### Ralph Integration
+
+Ralph picks up epics at `pipeline:design` in dependency order (Level 0
+first, then by roadmap ordering). Each Ralph session: orchestrator
+dispatches coordinator, coordinator drives one epic through the full
+design cycle. The full cycle — assessment, team assembly, design
+production, PR review, task decomposition — is autonomous. Circuit
+breaker for stakeholder escalation.
+
+### End-to-End: Design
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator (Ralph)
+    participant C as Project Coordinator
+    participant A as Architect
+    participant SC as Spec Compliance
+    participant SP as Specialists
+    participant FS as File System
+    participant GH as GitHub
+
+    Note over O: RALPH SESSION — Design
+
+    O->>O: Orient — picks highest-priority<br/>epic at pipeline:design
+    O->>C: Dispatches coordinator for epic
+
+    Note over C: ASSESSMENT
+    C->>FS: Reads epic + PRDs + existing designs
+    C->>C: Determines repos/stacks involved
+    C->>C: Assesses complexity — full team or lightweight?
+    C->>C: Spike needed? (unknowns assessment)
+    C->>C: Assembles design team from repos.yaml
+
+    Note over A,SP: PHASE A — Design Production
+    A->>FS: Reads Level 0 designs + other epic designs
+    A->>FS: Reads existing codebase (structure,<br/>models, APIs, patterns, deps)
+    SP->>FS: Read existing code — patterns,<br/>conventions, tech debt
+    A->>FS: Produces architecture doc with<br/>requirements traceability
+    A->>FS: Writes ADRs for significant decisions
+    SP->>FS: Contribute stack-specific design<br/>(API contracts, schemas, UX specs)
+    C->>GH: Branch + PR (NOT draft)
+    C->>GH: Issue comment: "design proposed,<br/>PR ready for review"
+
+    Note over A,SP: PHASE B — PR Review Cycle
+    C->>A: Request review
+    C->>SC: Request review
+    C->>SP: Request review
+    A->>GH: PR review: architecture quality,<br/>cross-epic consistency
+    SC->>GH: PR review: PRD coverage,<br/>cross-document consistency
+    SP->>GH: PR review: stack-specific<br/>technical correctness
+
+    alt All approve (no concerns)
+        A->>GH: Approves PR
+        SC->>GH: Approves PR
+        SP->>GH: Approve PR
+        C->>GH: Issue comment: "PR reviewed, approved"
+    else Concerns raised
+        C->>FS: Addresses PR comments on branch<br/>(with architect input)
+        C->>GH: Pushes revisions, replies to comments
+        C->>GH: Issue comment: "PR reviewed,<br/>N concerns addressed — re-review requested"
+        Note over C: Repeats until approved or 3+ cycles
+    else 3+ cycles without convergence
+        C->>GH: Issue comment: "escalated to stakeholder"
+        C->>GH: Adds needs-stakeholder-input label
+        Note over O: Ralph stops — user engages
+    end
+
+    Note over C: PHASE C — Task Decomposition (same session)
+    C->>GH: Merges design PR
+    C->>GH: Creates task issues in component repos<br/>at pipeline:implement
+    C->>GH: Issue comment: "design complete,<br/>N tasks created"
+    C->>FS: Updates STATUS.md
+    Note over O: Design complete — tasks ready for implementation
+```
+
+---
+
+## Notes for Later Phases
+
+> Rough notes. Each phase gets detailed treatment when we get to it.
 
 ### Phase 4: Implement (per task)
 - Engineer codes + creates PR → issue → `pipeline:verify`
@@ -620,6 +1157,27 @@ works, PM signs off, and epic issues are created without user intervention.
 | Initiative labels are dynamic | Created by coordinator during decomposition, not pre-defined — keeps things flexible |
 | Unified orchestrator handles multiple stages | Single `/orchestrate` skill reads pipeline label and dispatches to correct logic; ralph.sh stays simple |
 | Decompose is mostly autonomous (no stakeholder unless circuit breaker) | Different from review where stakeholder always engages; PM can sign off without user involvement |
+| Decompose uses PR review comments (same as review phase) for sign-off | Consistent mechanism across pipeline, traceable review trail via PR comments |
+| Foundational epics (Level 0) identified during decompose by both PM and architect | Data model, auth model, persona model, etc. must be designed before feature epics |
+| Design team is dynamic per epic — architect + spec-compliance always present | Specialists assembled from repos.yaml stack info; right experts for the right epic |
+| Level 0 foundational epics designed first | Their outputs (data model, auth model, API conventions, UX model) constrain all subsequent designs |
+| Cross-epic consistency enforced by architect + spec-compliance | Architect checks architectural integration; spec-compliance checks document/terminology/model consistency |
+| Spec-compliance in design review — vertical + horizontal | Vertical: PRD requirements coverage. Horizontal: cross-document consistency (terminology, models, conventions) |
+| Task decomposition happens during Design phase | Coordinator breaks epics into repo-specific tasks after design is approved |
+| Quality gates defined per-epic during design | Test coverage, API validation, performance budgets, accessibility — flow down to task acceptance criteria |
+| Design uses same PR review + comment cycle as Review and Decompose | Consistent mechanism across all pipeline phases |
+| Full PRD traceability enforced in design | Design docs cite specific PRD requirements; review includes coverage check; chain: PRD → Epic → Design → Task |
+| Designs must be codebase-aware | Team reads existing code before designing — reuse over reinvent, pattern consistency, compatibility with existing APIs/schemas, tech debt awareness |
+| Coordinator drives Design phase (same as Decompose) | Keeps orchestrator thin; coordinator choreographs the multi-agent design session |
+| Spec-compliance is a reviewer, not a design producer | Separation of concerns — architect designs, spec-compliance validates against PRDs and cross-document consistency |
+| Lightweight path for simpler epics | Not every epic needs the full team; coordinator assesses and assembles minimum viable team |
+| Task decomposition in same session as design | Design session's context is fresh; deferring wastes it |
+| Design doc template needed | Standardises design artifacts like roadmap template standardises decompose output |
+| Design spikes for uncertain epics | Time-boxed investigations before committing design effort; avoids designing in the abstract |
+| Backward transition from Design → Decompose | Safety valve when design reveals epic scope is wrong; coordinator sends back with explanation |
+| Specific codebase reading guidance | Coordinator ensures team reads the right layers — not "read everything" but targeted reading of structure, models, APIs, patterns |
+| Quality gates structured into categories | Code quality (CI), non-functional (verify), design-level (review) — each with measurable criteria |
+| Sequential design via Ralph (parallelization deferred) | Ralph runs one session at a time; parallel design is a future optimisation |
 
 ---
 
@@ -630,7 +1188,7 @@ works, PM signs off, and epic issues are created without user intervention.
 | 1 | Should init and adapt be one skill or two? | Currently drafted as separate — may simplify to one |
 | 2 | What makes a PRD "good enough" for initial submission? | User needs some guidance without imposing a rigid template |
 | 3 | How does the facilitator handle a user who disagrees with all review findings? | Edge case — need a graceful "override" path |
-| 4 | What happens if review cycles exceed N iterations? | Need a circuit breaker — maybe escalate to human judgment |
+| 4 | ~~What happens if review cycles exceed N iterations?~~ | **Answered:** Circuit breaker at 3 cycles → escalate to stakeholder |
 | 5 | Later phases will need more engagement types — what do we call design review facilitation? | May be same Stakeholder Facilitator with different context, or may warrant a new type |
 | 6 | Should `/submit-prds` create one issue per submission or reuse existing? | First run = create. Re-run after facilitator adds PRDs = same issue? new? |
 | 7 | What if `gh auth status` fails at init? | Need to fail fast with clear guidance |

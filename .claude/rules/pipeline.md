@@ -71,33 +71,114 @@ label is only added when the team cannot converge (circuit breaker).
 
 | Agent | Role | What they do |
 |-------|------|-------------|
-| project-coordinator (primary) | Drives the process | Invokes PM and architect, synthesizes roadmap, creates PR, manages sign-off cycle |
-| product-manager | Product grouping | Proposes which PRDs form epics, initiative themes, priority ordering |
-| architect | Technical analysis | Identifies technical epics, dependency constraints, ordering |
+| project-coordinator (primary) | Drives the process | Invokes PM and architect, synthesizes roadmap, creates PR, manages PR review cycle |
+| product-manager | Product grouping + PR review | Proposes product groupings + foundational product epics, reviews roadmap PR |
+| architect | Technical analysis + PR review | Identifies foundational design epics + infrastructure epics, reviews roadmap PR |
 
 ### Sub-State Machine
 
 | Sub-state | Detected by | Next action |
 |-----------|------------|-------------|
-| Issue created (no agent comments) | No decompose comment from agents | Coordinator decomposes |
-| "decomposition proposed, awaiting sign-off" | Latest coordinator comment | PM reviews the roadmap |
-| "sign-off: approved" | Latest PM comment | Merge PR, create epic issues at `pipeline:design` |
-| "sign-off: concerns — [details]" | Latest PM comment | Coordinator revises |
-| "revision N — [what changed]" | Latest coordinator comment | PM re-reviews |
-| "escalated to stakeholder" | Coordinator comment (3+ revision cycles) | If interactive: engage user. If Ralph: stop |
+| Issue created (no agent comments) | No decompose comment from agents | Coordinator produces roadmap |
+| "decomposition proposed, PR ready for review" | Coordinator comment | PM + architect review the PR |
+| "PR reviewed, N concerns raised" | PM/architect PR comments | Coordinator addresses PR comments |
+| "PR reviewed, approved" | PM/architect comment (all concerns resolved) | Merge PR, create epic issues at `pipeline:design` |
+| "escalated to stakeholder" | Coordinator comment (3+ review cycles) | If interactive: engage user. If Ralph: stop |
 | "stakeholder input provided" | User/facilitator comment | Coordinator revises |
 
-### PM Sign-Off
+### PR Review Cycle
 
-The product-manager reviews the completed roadmap and either approves or
-flags concerns. This is an internal team cycle — the stakeholder is NOT
-involved unless the circuit breaker triggers.
+PM and architect review the roadmap PR with actual PR comments (same
+mechanism as the review phase). The coordinator addresses concerns on
+the branch and requests re-review. Both PM and architect must approve
+the PR for it to merge. The stakeholder is NOT involved unless the
+circuit breaker triggers.
 
 ### Circuit Breaker
 
-If the coordinator and PM cycle through 3+ revisions without converging,
-the coordinator adds `needs-stakeholder-input` and writes a summary of
-what the team cannot resolve. Ralph stops and the user engages directly.
+If the coordinator and reviewers cycle through 3+ PR review rounds
+without converging, the coordinator adds `needs-stakeholder-input` and
+writes a summary of what the team cannot resolve. Ralph stops and the
+user engages directly.
+
+## Design Phase Sub-States
+
+The design phase uses a single `pipeline:design` label throughout.
+Sub-state is tracked via issue comments. The `needs-stakeholder-input`
+label is only added when the circuit breaker triggers.
+
+### Design Team (dynamic per epic)
+
+| Agent | When | Role |
+|-------|------|------|
+| project-coordinator | Always | Drives the process, assembles team, manages PR review cycle, task decomposition |
+| architect | Always | System design, cross-epic consistency, ADRs, integration, codebase patterns |
+| spec-compliance | If epic has PRD linkage | PRD coverage (vertical) + cross-document consistency (horizontal) |
+| frontend-architect | If epic has UI | Component architecture, state management, performance budgets |
+| ux-architect | If epic has UX | User flows, interaction design, accessibility |
+| engineer-dotnet | If epic touches .NET repos | .NET design + codebase review |
+| engineer-python | If epic touches Python repos | Python design + codebase review |
+| engineer-angular | If epic touches Angular/TS repos | Angular/TS design + codebase review |
+| engineer-typescript | If epic touches Node/TS repos | Node/TS design + codebase review |
+| database-engineer | If epic has data concerns | Schema design, query patterns, migrations |
+| devops-engineer | If epic has infra concerns | CI/CD, deployment, monitoring |
+
+**Lightweight path:** Not every epic needs the full team. The coordinator
+assesses the epic's scope and assembles the minimum viable team. Architect
+is always present; spec-compliance is present for any epic with PRD linkage.
+
+### Sub-State Machine
+
+| Sub-state | Detected by | Next action |
+|-----------|------------|-------------|
+| Needs design (no agent comments) | No design comment from agents | Coordinator assesses + assembles team |
+| "spike needed: [unknowns]" | Coordinator comment | Coordinator runs time-boxed spike |
+| "design proposed, PR ready for review" | Coordinator comment | Design team reviews the PR |
+| "PR reviewed, N concerns" | Reviewer PR comments | Coordinator addresses PR comments |
+| "PR reviewed, approved" | All reviewers approve | Merge PR, decompose into tasks |
+| "design complete, N tasks created" | Coordinator comment | Advance epic |
+| "escalated to stakeholder" | Coordinator comment (3+ cycles) | If interactive: engage user. If Ralph: stop |
+| "needs-redecompose: [reason]" | Coordinator comment | Send back to `pipeline:decompose` |
+
+### PR Review Cycle
+
+The coordinator creates the design PR (NOT draft) and requests reviews
+from the assembled design team. Reviewers leave PR comments:
+
+- **Architect**: architectural quality, cross-epic integration, pattern consistency
+- **Spec-compliance**: PRD coverage, cross-document consistency, terminology
+- **Specialists**: stack-specific technical correctness
+
+The coordinator addresses comments on the branch (consulting architect
+for architectural concerns, specialists for stack concerns) and re-requests
+review. Both architect and spec-compliance (when present) must approve.
+
+### Circuit Breaker
+
+If the coordinator and reviewers cycle through 3+ PR review rounds
+without converging, the coordinator adds `needs-stakeholder-input` and
+writes a summary of what the team cannot resolve. Ralph stops and the
+user engages directly.
+
+### Amendment Issues
+
+If during design or review, cross-epic inconsistency or PRD gaps are
+discovered, the coordinator creates a `type:amendment` issue:
+
+- Targeting `pipeline:design` for design inconsistencies
+- Targeting `pipeline:review` for PRD gaps
+
+The amendment issue enters the pipeline at the appropriate stage and
+follows its own review cycle. This is a lightweight corrective path,
+not a full re-design.
+
+### Re-Decompose (Safety Valve)
+
+If the design reveals the epic's scope is fundamentally wrong (missing
+concerns, overlapping with another epic, needs splitting), the
+coordinator sends the epic back to `pipeline:decompose` with a comment
+explaining why. The roadmap needs updating and re-review. This is a
+safety valve, not a common path.
 
 ## Forward Transitions
 
@@ -114,9 +195,12 @@ what the team cannot resolve. Ralph stops and the user engages directly.
 - Initiative labels applied
 
 ### design → implement
-- Architecture and/or UX design docs exist
-- Design reviewed and merged
-- Tasks created in component repos
+- Design doc(s) approved and merged via PR
+- Requirements traceability complete (spec-compliance validated)
+- Cross-epic consistency verified (architect validated)
+- Tasks created in component repos at `pipeline:implement`
+- Each task has scope, acceptance criteria, and quality gates from design
+- Epic issue updated with task links
 
 ### implement → verify
 - Implementation complete in component repo

@@ -20,6 +20,22 @@ Thematic labels applied to epic issues for grouping and context.
 
 ---
 
+## Foundational Epics (Level 0)
+
+Epics that establish cross-cutting models and conventions. These must
+complete design before feature epics can begin their design phase.
+
+### EPIC-FNNN: [Foundation Epic Title]
+
+- **Type:** Product foundation | Technical foundation
+- **Source:** PM analysis | Architect analysis
+- **Initiative:** `initiative:[tag]`
+- **Dependencies:** None (foundational)
+- **Rationale:** [Why this must be established before feature epics]
+- **Scope summary:** [What this defines/produces]
+
+---
+
 ## Product Epics
 
 Epics derived from PRD groupings — each delivers a coherent slice of
@@ -56,7 +72,10 @@ necessary prerequisites.
 
 Sequenced delivery order. Epics at the same level can run in parallel.
 
-1. **Level 1 (foundational, no dependencies):**
+0. **Level 0 (foundational — must be designed first):**
+   - EPIC-FNNN: [data model / persona model / etc.]
+
+1. **Level 1 (depends on Level 0 designs):**
    - EPIC-NNN: [title]
    - EPIC-TNNN: [title]
 
