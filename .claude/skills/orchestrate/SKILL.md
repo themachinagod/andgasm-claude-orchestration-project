@@ -69,10 +69,13 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
      - Report: "No open pipeline issues and no PRDs to submit. Nothing to orchestrate."
      - Update STATUS.md if needed
      - `cd ..` and stop
-5. For each pipeline issue, read the comments to determine sub-state:
+5. For each pipeline issue, read the latest state comment to determine sub-state:
    ```bash
-   gh issue view [NUMBER] --json comments --jq '.comments[-1].body'
+   gh issue view [NUMBER] --json comments --jq '[.comments[] | select(.body | contains("**Status:**"))] | last | .body'
    ```
+   The orchestrator detects state by finding the latest issue comment
+   containing `**Status:**` and reading the text after it. If no comment
+   contains `**Status:**`, the issue is in its initial sub-state.
 6. Check for associated PR:
    ```bash
    gh pr list --json number,title,headRefName,body \
@@ -111,10 +114,10 @@ Read the latest issue comment to determine the review sub-state:
 
 | What you see | Sub-state | Next action |
 |-------------|-----------|-------------|
-| No comments from agents (just the original body) | **Needs first review** | Invoke Review Team |
-| Latest comment contains "items need stakeholder input" | **Needs stakeholder input** | Check if interactive, invoke Facilitator or stop |
-| Latest comment contains "input provided, ready for re-review" | **Needs re-review** | Invoke Review Team |
-| Latest comment contains "approved" or "all clean" | **Approved** | Merge PR, advance label |
+| No `**Status:**` comment from agents | **Needs first review** | Invoke Review Team |
+| `**Status:** Reviewed, [N] items need stakeholder input` | **Needs stakeholder input** | Check if interactive, invoke Facilitator or stop |
+| `**Status:** stakeholder input provided, ready for re-review` | **Needs re-review** | Invoke Review Team |
+| `**Status:** Approved` | **Approved** | Check CI, merge PR, advance label |
 | `needs-stakeholder-input` label present | **Waiting for user** | Stop (Ralph) or invoke Facilitator (interactive) |
 
 ##### Sub-state: Needs First Review / Needs Re-Review
@@ -236,13 +239,22 @@ Do NOT attempt to facilitate without the user. Instead:
 
 ##### Sub-state: Approved
 
-Merge the PR and advance the issue:
+Verify CI before merging:
 
 ```bash
 cd [DOCS_REPO]
+gh pr checks [PR_NUMBER] --repo [owner/docs-repo] --required --fail
+```
+
+If CI fails, do NOT merge. Route back to the review team to fix. Only
+proceed with merge when CI is green:
+
+```bash
 gh pr merge [PR_NUMBER] --squash --delete-branch
 gh issue edit [NUMBER] --remove-label "pipeline:review" --add-label "pipeline:decompose"
-gh issue comment [NUMBER] --body "PRDs approved and merged. Issue advanced to pipeline:decompose."
+gh issue comment [NUMBER] --body "PRDs approved and merged. Issue advanced to pipeline:decompose.
+
+**Status:** approved, PR merged, advanced to decompose"
 ```
 
 Update STATUS.md:
@@ -263,12 +275,12 @@ the roadmap PR with actual PR comments (same mechanism as the review phase):
 
 | What you see | Sub-state | Next action |
 |-------------|-----------|-------------|
-| No agent comments (just the original body) | **Needs decomposition** | Dispatch coordinator (full cycle) |
-| "decomposition proposed, PR ready for review" | **PR under review** | Dispatch PM + architect to review the PR |
-| "PR reviewed, N concerns addressed — re-review requested" | **PR under review** | Dispatch PM + architect to re-review |
-| "PR reviewed, approved" | **Approved** | Merge PR, create epic issues |
-| "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
-| "stakeholder input provided" | **Needs revision** | Dispatch coordinator to revise |
+| No `**Status:**` comment from agents | **Needs decomposition** | Dispatch coordinator (full cycle) |
+| `**Status:** decomposition proposed, PR ready for review` | **PR under review** | Dispatch PM + architect to review the PR |
+| `**Status:** PR reviewed, N concerns addressed — re-review requested` | **PR under review** | Dispatch PM + architect to re-review |
+| `**Status:** PR reviewed, approved` | **Approved** | Check CI, merge PR, create epic issues |
+| `**Status:** escalated to stakeholder` | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
+| `**Status:** stakeholder input provided` | **Needs revision** | Dispatch coordinator to revise |
 | `needs-stakeholder-input` label present | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
 
 ##### Sub-state: Needs Decomposition
@@ -294,11 +306,17 @@ cycles before escalating).
 
 ##### Sub-state: Approved (PR reviewed, approved)
 
-Both PM and architect have approved the roadmap PR. Merge and create
-epic issues:
+Both PM and architect have approved the roadmap PR. Verify CI before merging:
 
 ```bash
 cd [DOCS_REPO]
+gh pr checks [PR_NUMBER] --repo [owner/docs-repo] --required --fail
+```
+
+If CI fails, do NOT merge. Route back to the coordinator to fix. Only
+proceed with merge when CI is green:
+
+```bash
 gh pr merge [PR_NUMBER] --squash --delete-branch
 ```
 
@@ -320,7 +338,9 @@ gh issue edit [NUMBER] \
 gh issue comment [NUMBER] --body "## Decomposition Complete
 
 Created [N] epic issues at pipeline:design.
-Roadmap merged: docs/planning/roadmap.md"
+Roadmap merged: docs/planning/roadmap.md
+
+**Status:** decomposition complete, [N] epics created"
 gh issue close [NUMBER]
 ```
 
@@ -367,14 +387,14 @@ the design PR with PR comments (same mechanism as review and decompose):
 
 | What you see | Sub-state | Next action |
 |-------------|-----------|-------------|
-| No agent comments (just the original body) | **Needs design** | Dispatch coordinator (full design cycle) |
-| "spike needed: [unknowns]" | **Spike needed** | Coordinator runs time-boxed spike |
-| "design proposed, PR ready for review" | **PR under review** | Review team reviews the PR |
-| "PR reviewed, N concerns addressed — re-review requested" | **PR under review** | Review team re-reviews |
-| "PR reviewed, approved" | **Approved** | Merge PR, decompose into tasks |
-| "design complete, N tasks created" | **Tasks created** | Advance epic to implement |
-| "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
-| "needs-redecompose: [reason]" | **Needs re-decompose** | Send epic back to `pipeline:decompose` |
+| No `**Status:**` comment from agents | **Needs design** | Dispatch coordinator (full design cycle) |
+| `**Status:** spike needed: [unknowns]` | **Spike needed** | Coordinator runs time-boxed spike |
+| `**Status:** design proposed, PR ready for review` | **PR under review** | Review team reviews the PR |
+| `**Status:** PR reviewed, N concerns addressed — re-review requested` | **PR under review** | Review team re-reviews |
+| `**Status:** PR reviewed, approved` | **Approved** | Check CI, merge PR, decompose into tasks |
+| `**Status:** design complete, N tasks created` | **Tasks created** | Advance epic to implement |
+| `**Status:** escalated to stakeholder` | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
+| `**Status:** needs-redecompose: [reason]` | **Needs re-decompose** | Send epic back to `pipeline:decompose` |
 | `needs-stakeholder-input` label present | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
 
 ##### Sub-state: Needs Design
@@ -413,21 +433,37 @@ before committing to a full design. The coordinator delegates the spike
 to the architect (and relevant specialists) for a time-boxed
 investigation in a throwaway branch.
 
-On completion, the coordinator updates the issue comment to
-"spike completed, findings recorded" and the epic returns to the
-Needs Design state with spike findings available. Re-dispatch the
-coordinator to continue with the full design.
+On completion, the coordinator updates the issue with a comment
+including `**Status:** spike completed, findings recorded` and the
+epic returns to the Needs Design state with spike findings available.
+Re-dispatch the coordinator to continue with the full design.
 
 ##### Sub-state: Approved (PR reviewed, approved)
 
-All reviewers have approved the design PR. The coordinator merges the
-PR and decomposes into tasks (invoking relevant engineer agents for
-task boundary advice, then assembling and creating task issues):
+All reviewers have approved the design PR. Verify CI before merging:
 
 ```bash
 cd [DOCS_REPO]
+gh pr checks [PR_NUMBER] --repo [owner/docs-repo] --required --fail
+```
+
+If CI fails, do NOT merge. Route back to the coordinator to fix. Only
+proceed with merge when CI is green:
+
+```bash
 gh pr merge [PR_NUMBER] --squash --delete-branch
 ```
+
+**Repo provisioning gate:** Before creating task issues, the coordinator
+must verify that all component repos referenced in the design exist:
+
+```bash
+gh repo view [owner/repo] --json name --jq .name
+```
+
+If a repo does not exist, the coordinator must either provision it
+(using the `/repo-provision` skill) or raise a blocker issue. Do not
+create task issues targeting a repo that does not exist.
 
 The coordinator creates task issues in the appropriate component repos
 (from `repos.yaml`) at `pipeline:implement`. Each task references the
@@ -470,7 +506,9 @@ Send the epic back to `pipeline:decompose`:
 ```bash
 cd [DOCS_REPO]
 gh issue edit [NUMBER] --remove-label "pipeline:design" --add-label "pipeline:decompose"
-gh issue comment [NUMBER] --body "Sent back to decompose: [reason from coordinator comment]"
+gh issue comment [NUMBER] --body "Sent back to decompose: [reason from coordinator comment]
+
+**Status:** needs-redecompose: [reason]"
 cd ..
 ```
 
@@ -632,53 +670,66 @@ Read the latest comment on each task issue to determine sub-state.
 
 | What you see | Sub-state | Next action |
 |-------------|-----------|-------------|
-| No agent comments, unclaimed | **Ready** | Dispatch coordinator to assess + dispatch engineer |
-| "claimed by [session]" or `claimed:*` label | **In progress** | Skip — engineer is working |
-| "implementation complete, PR ready for review" | **PR ready** | Dispatch coordinator to assemble + dispatch review team |
-| "PR under review" | **Under review** | Skip — reviewers working |
-| "PR reviewed, N concerns raised" | **Needs changes** | Dispatch coordinator to route concerns to engineer |
-| "PR reviewed, N concerns addressed — re-review requested" | **Re-review needed** | Dispatch coordinator to re-dispatch review team |
-| "PR reviewed, approved" | **Approved** | Merge PR, advance task to `pipeline:done` |
-| "escalated to stakeholder" | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
-| "blocked: amendment #NNN" | **Blocked** | Skip until amendment resolved |
+| No `**Status:**` comment from agents, no `claimed:*` label | **Ready** | Dispatch coordinator for this task |
+| `**Status:** claimed by [session]` or `claimed:*` label | **In progress** | Skip — engineer is working |
+| `**Status:** implementation complete, PR #NNN ready for review` | **PR ready** | Same coordinator invocation manages the review cycle |
+| `**Status:** PR under review` | **Under review** | Skip — reviewers working |
+| `**Status:** PR reviewed, N concerns raised` | **Needs changes** | Dispatch coordinator to route concerns to engineer |
+| `**Status:** PR reviewed, N concerns addressed — re-review requested` | **Re-review needed** | Dispatch coordinator to re-dispatch review team |
+| `**Status:** PR reviewed, approved` | **Approved** | Check CI, merge PR, advance task to `pipeline:done` |
+| `**Status:** escalated to stakeholder` | **Needs stakeholder** | If interactive: engage user. If Ralph: stop |
+| `**Status:** blocked: amendment #NNN` | **Blocked** | Check if amendment resolved; if so, unblock and treat as ready |
 | `needs-stakeholder-input` label | **Waiting for user** | Stop (Ralph) or engage user (interactive) |
 
-##### Sub-state: Ready (task unclaimed, no comments)
+##### Sub-state: Ready (task unclaimed, no `**Status:**` comments)
 
 Check the task's dependencies (listed in the task issue body). If
 dependencies are not met (referenced tasks not at `pipeline:done`),
 skip this task.
 
-If dependencies are met, dispatch the `project-coordinator`:
+If dependencies are met, dispatch the `project-coordinator` for this
+specific task. One coordinator invocation drives one task through the
+full implementation and review cycle (same pattern as design phase:
+one coordinator per epic).
 
 - "Task #[NUMBER] in [repo-name] is at pipeline:implement and ready."
 - "Read the task issue for scope, acceptance criteria, and quality gates."
 - "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
-- "Read `repos.yaml` for the component repo's stack."
-- "Dispatch the appropriate engineer sub-agent for the repo's stack."
+- "Read the component repo's manifest files (package.json, *.csproj,
+  pyproject.toml, etc.) and agent descriptions to select the appropriate
+  engineer for this repo's stack. Do not use a rigid lookup table —
+  read the repo context and match to agent capabilities."
+- "Dispatch the selected engineer sub-agent."
 - "The engineer should: read the codebase, create a feature branch,
   implement, write tests, ensure CI passes (build + test + lint),
-  create a PR (NOT draft), and update the task issue with
-  'implementation complete, PR #NNN ready for review'."
+  create a PR (NOT draft), and update the task issue with:
+  '**Status:** implementation complete, PR #NNN ready for review'."
+- "After the engineer reports back, verify CI is green on the PR:
+  `gh pr checks [PR_NUMBER] --repo [owner/repo] --required --fail`"
+- "Then assemble the review team dynamically: read the PR diff, the
+  repo manifest files, and agent descriptions to select reviewers.
+  Principles: peer engineer (always), architect (if APIs/integration),
+  specialist reviewers (based on what the PR touches),
+  spec-compliance as final gate (if PRD-linked). Not every task needs
+  every reviewer — assemble the minimum viable review team."
+- "Manage the full review cycle: route concerns to engineer, verify
+  CI after each revision, re-dispatch reviewers, until all approve
+  or circuit breaker triggers."
 
 ##### Sub-state: PR Ready (implementation complete)
 
-The engineer has created a PR and CI is green. Dispatch the
-`project-coordinator` to assemble the review team:
+This sub-state is handled by the same coordinator invocation that
+started the task. If the orchestrator encounters a task at this
+sub-state without an active coordinator (e.g., session interrupted),
+re-dispatch the `project-coordinator` to pick up from the review cycle:
 
 - "Task #[NUMBER] in [repo-name] has a PR ready for review."
-- "Read the PR to understand what changed."
-- "Assemble the review team dynamically based on what the PR touches:"
-- "  - Peer engineer (always) — same stack as implementer"
-- "  - Architect — if PR touches APIs, integration, shared concerns"
-- "  - Frontend-architect — if PR touches UI components"
-- "  - UX-architect — if PR touches user-facing flows"
-- "  - Database-engineer — if PR touches data/schema/migrations"
-- "  - DevOps-engineer — if PR touches infrastructure/CI/deployment"
-- "  - Security-reviewer — if PR touches auth, user input, external integrations"
-- "  - Spec-compliance (final gate) — if task is PRD-linked"
-- "Dispatch reviewers to leave PR comments. When all approve, merge
-  the PR and advance the task to pipeline:done."
+- "Verify CI is green: `gh pr checks [PR_NUMBER] --repo [owner/repo] --required --fail`"
+- "If CI fails, route back to the engineer to fix."
+- "Read the PR diff, repo manifest files, and agent descriptions to
+  assemble the review team dynamically. Do not use a rigid lookup
+  table — match reviewers to what the PR touches."
+- "Manage the review cycle through to completion."
 
 ##### Sub-state: Needs Changes (concerns raised)
 
@@ -687,8 +738,8 @@ The coordinator routes review concerns to the implementation engineer:
 - "PR #[NUMBER] in [repo-name] has reviewer concerns."
 - "Route the concerns to the implementation engineer."
 - "The engineer addresses concerns, ensures CI passes, pushes to the
-  PR branch, and updates the task issue: 'PR reviewed, N concerns
-  addressed — re-review requested'."
+  PR branch, and updates the task issue with:
+  '**Status:** PR reviewed, N concerns addressed — re-review requested'."
 
 ##### Sub-state: Re-review Needed
 
@@ -697,15 +748,24 @@ subset whose concerns were addressed).
 
 ##### Sub-state: Approved (all reviewers approve)
 
-Merge the PR and advance the task:
+Verify CI before merging:
 
 ```bash
 cd [component-repo]
+gh pr checks [PR_NUMBER] --repo [owner/repo] --required --fail
+```
+
+If CI fails, do NOT merge. Route back to the engineer to fix. Only
+proceed with merge when CI is green:
+
+```bash
 gh pr merge [PR_NUMBER] --squash --delete-branch
 gh issue edit [TASK_NUMBER] \
   --remove-label "pipeline:implement" \
   --add-label "pipeline:done"
-gh issue comment [TASK_NUMBER] --body "PR reviewed, approved. PR merged."
+gh issue comment [TASK_NUMBER] --body "PR reviewed, approved. PR merged.
+
+**Status:** PR reviewed, approved. PR merged, task complete."
 gh issue close [TASK_NUMBER]
 cd ..
 ```
@@ -746,22 +806,47 @@ update STATUS.md, report.
 
 ##### Sub-state: Blocked
 
-The task is blocked by an amendment issue in the docs repo. Skip until
-the amendment is resolved (amendment issue closed, `blocked` label
-removed from the task).
+The task is blocked by an amendment issue in the docs repo. When a
+blocked task is encountered, check whether the blocking amendment has
+been resolved:
 
-##### Multiple Tasks
+```bash
+gh issue view [AMENDMENT_NUMBER] --repo [owner/docs-repo] --json state --jq .state
+```
 
-When multiple tasks are ready, handle them based on priority:
+If the amendment state is `"CLOSED"`, the blocker is resolved. Remove
+the `blocked` label from the task and treat it as ready:
 
-1. Tasks whose dependencies just completed (unblocked work)
-2. Tasks with review concerns needing routing (keep PRs moving)
-3. Tasks with approved PRs needing merge
-4. New tasks ready for implementation
+```bash
+gh issue edit [TASK_NUMBER] --repo [owner/repo] --remove-label "blocked"
+gh issue comment [TASK_NUMBER] --repo [owner/repo] --body "Amendment #[AMENDMENT_NUMBER] resolved. Task unblocked.
+
+**Status:** unblocked, ready for implementation"
+```
+
+Then dispatch the coordinator for this task as per the Ready sub-state.
+
+If the amendment is still `"OPEN"`, skip this task until the next
+orchestration cycle.
+
+##### Task Selection
+
+When multiple tasks are actionable, the orchestrator picks **one task
+per cycle** based on priority:
+
+1. Tasks with approved PRs needing merge (quick wins, unblock dependents)
+2. Tasks whose blockers just resolved (newly unblocked work)
+3. Tasks with review concerns needing routing (keep PRs moving)
+4. New tasks ready for implementation (dependencies met, unclaimed)
+
+The orchestrator dispatches **one coordinator per task**. Each
+coordinator invocation drives its task through the full implementation
+and review cycle. Do not batch multiple tasks into a single coordinator
+dispatch.
 
 In concurrent mode (multiple terminals), each session claims one task
-at a time. In sequential mode (single Ralph), handle the highest-priority
-task per cycle.
+at a time via `claimed:*` labels. In sequential mode (single Ralph),
+handle the highest-priority task per cycle.
 
 ---
 

@@ -199,7 +199,7 @@ the frontend design content and participate in the PR review cycle.
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: architecture missing [what]" \
-  --label "type:amendment,pipeline:design,blocked" \
+  --label "type:amendment,pipeline:design,blocker" \
   --body "Blocks #[original-issue]. Frontend arch needs: [specific detail]."
 cd ..
 ```
@@ -209,7 +209,7 @@ cd ..
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: UX spec missing [what]" \
-  --label "type:amendment,pipeline:design,blocked" \
+  --label "type:amendment,pipeline:design,blocker" \
   --body "Blocks #[original-issue]. Frontend arch needs: [specific detail]."
 cd ..
 ```
@@ -219,7 +219,7 @@ cd ..
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: PRD-NNN missing [what]" \
-  --label "type:amendment,pipeline:review,blocked" \
+  --label "type:amendment,pipeline:review,blocker" \
   --body "Blocks #[original-issue]. Gap: [specific detail needed]."
 cd ..
 ```

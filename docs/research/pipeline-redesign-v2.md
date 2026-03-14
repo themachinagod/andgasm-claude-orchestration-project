@@ -1147,8 +1147,16 @@ Implementation follows the same phase pattern as every other phase:
 a **production step** (engineer writes code) and a **review cycle**
 (specialist team reviews the PR via PR comments). There is no separate
 "verify" phase — review is built into every phase. The task stays at
-`pipeline:implement` throughout, with sub-state tracked via issue
-comments, consistent with the entire pipeline.
+`pipeline:implement` throughout, with sub-state tracked via structured
+issue comments (see **Structured State Markers** below), consistent
+with the entire pipeline.
+
+The coordinator is dispatched **once per task** — same as it is dispatched
+once per epic in design. One coordinator invocation drives one task
+through the full cycle: assess, assemble team, dispatch engineer, manage
+review, merge on approval. The orchestrator manages the higher-level
+coordination: which tasks are ready, which are blocked, is the epic
+complete.
 
 ### Inputs
 
@@ -1164,96 +1172,116 @@ comments, consistent with the entire pipeline.
 
 ### Implementation Team (dynamic per task)
 
-Like every other phase, the team is assembled dynamically based on what
-the task touches. The coordinator assesses the task scope and selects
-the appropriate specialists for both implementation and review.
+Like every other phase, the team is assembled **dynamically** based
+on what the task touches. The coordinator does not use a rigid
+stack-to-agent lookup table. Instead, it:
+
+1. Reads the task issue, design doc, and component repo context
+   (manifest files like `package.json`, `.csproj`, `pyproject.toml`)
+2. Reads the available agent descriptions (`.claude/agents/*.md`)
+3. Intelligently selects the appropriate engineer for implementation
+   and the appropriate specialists for review
+
+This is the same principle as a human tech lead looking at a task and
+knowing who to assign and who should review — based on the work, not
+a static mapping.
 
 #### Production: Engineer
 
-One engineer agent implements the task. The engineer type is determined
-by the component repo's stack (from `repos.yaml`):
-
-| Repo stack | Engineer agent |
-|-----------|---------------|
-| .NET / C# | engineer-dotnet |
-| Python | engineer-python |
-| Angular / TypeScript | engineer-angular |
-| Node.js / TypeScript | engineer-typescript |
+One engineer agent implements the task. The coordinator selects the
+engineer whose expertise matches the component repo's technology —
+determined by reading the repo's manifest files and codebase, not a
+preconfigured field.
 
 #### Review: Dynamic Specialist Team
 
-The review team is assembled by the coordinator based on what the task
-touches — the same principle as design team assembly. **Whoever
+The review team is assembled by the coordinator based on what the PR
+changes — the same principle as design team assembly. **Whoever
 contributed to the design should review the implementation of that
 design.** They have the context and can spot drift.
 
-| Task touches | Reviewer | What they check |
-|-------------|----------|----------------|
-| Any task | engineer-[stack] (peer) | Code quality, stack-specific patterns, test quality, existing codebase consistency, readability |
-| API / backend logic | architect | Design conformance, cross-epic integration, pattern consistency with existing codebase, shared concerns |
-| UI components | frontend-architect | Component architecture, state management, performance budgets, design system conformance |
-| User flows / interaction | ux-architect | Accessibility, interaction patterns, UX consistency, responsive behaviour |
-| Database / schema | database-engineer | Query patterns, migrations, indexing, schema conformance with data model |
-| Infrastructure / CI | devops-engineer | Deployment configs, environment handling, monitoring, secrets management |
-| Any PRD-linked task | spec-compliance | PRD acceptance criteria met, design conformance, traceability |
-| Security-sensitive areas | security-reviewer (new) | OWASP, injection, auth, secrets in code, input validation |
+The coordinator reads the PR diff and the task context to determine
+which specialists are needed. Each available specialist agent
+describes what it reviews in its agent file — the coordinator matches
+the PR's scope to the right reviewers.
 
-**Not every task needs every reviewer.** A small backend bugfix may
-only need a peer engineer + architect. A full-stack feature touching
-UI, API, and database needs the wider team. The coordinator assesses
-and assembles the minimum viable review team — same lightweight path
-principle as design.
+**Principles for team assembly:**
 
-**The architect is present for any task that touches system integration
-points, APIs, or shared concerns** — they are the consistency thread
-across the whole project, same role as in design review.
-
-**Spec-compliance is the final gate** — their approval is required
-before merge for any task linked to PRD acceptance criteria. They
-validate that the implementation actually delivers what the PRD and
-design specified.
+- **Peer engineer** (always) — a second engineer of the same stack
+  type reviews for code quality, patterns, test quality, readability
+- **Specialist reviewers** — included when the PR touches their
+  domain (architect for APIs/integration, frontend-architect for UI,
+  ux-architect for user-facing flows, database-engineer for data,
+  devops-engineer for infra, security-reviewer for auth/input)
+- **Spec-compliance** (final gate) — present for any PRD-linked task.
+  Their approval is required before merge. They validate the code
+  delivers what the PRD and design specified.
+- **Lightweight path** — not every task needs every reviewer. A small
+  backend fix may only need peer engineer + architect. The coordinator
+  assesses and assembles the minimum viable review team.
 
 ### Who Drives Implementation
 
-The **project-coordinator** drives the implementation phase at the
-epic level, consistent with decompose and design. But the coordinator's
-role shifts from "drive each work item" to "dispatch, track, and
-integrate":
+The **project-coordinator** drives implementation **per task**, same
+as it drives design per epic. The orchestrator dispatches the
+coordinator once per task. The coordinator drives that task through
+the full cycle: assess, assemble team, dispatch engineer, manage
+review, merge on approval.
 
-| Coordinator responsibility | Detail |
-|---------------------------|--------|
-| **Task readiness** | Check dependency graph — which tasks are unblocked? |
-| **Team assembly** | For each ready task: select engineer + assemble review team |
-| **Dispatch** | Brief the engineer with full context (task, design, codebase location) |
-| **Review coordination** | When engineer's PR is ready, dispatch the review team |
-| **Concern routing** | Route review comments to the engineer (or escalate design gaps upstream) |
-| **Epic completion** | Track task progress, determine when all tasks for an epic are done |
-| **Integration oversight** | When concurrent tasks in the same repo complete, verify they integrate |
+```
+Orchestrator picks ready task
+  → Dispatches coordinator for that task
+    → Coordinator assesses task scope
+    → Coordinator selects engineer (reads repo context + agent descriptions)
+    → Coordinator assembles review team (reads PR scope + agent descriptions)
+    → Engineer implements (production step)
+    → Review team reviews PR (review cycle)
+    → Route concerns, re-review, converge or circuit-break
+    → On approval: merge, advance task
+  → Orchestrator checks: any more ready tasks? Epic complete?
+```
 
-Individual task execution is **engineer-led**, not coordinator-led. The
-engineer owns the implementation session. The coordinator dispatches,
-then re-engages when the PR is ready for review or when the task
-completes.
+The **orchestrator** manages the higher-level coordination:
+- Which tasks are ready (dependencies met, not claimed, not blocked)?
+- Dispatching coordinator for each ready task
+- Detecting epic completion (all tasks at `pipeline:done`)
+- Triggering final integration check via coordinator
+
+The **coordinator** manages one task at a time:
+- Ensures the engineer reads the design doc, linked PRDs, epic context,
+  and existing codebase (including other tasks already merged for this
+  epic and the wider system)
+- Assembles the review team dynamically when the PR is ready
+- Routes review concerns back to the engineer
+- Merges the PR on approval
+
+Individual task execution is **engineer-led**. The coordinator
+dispatches and manages process — same separation of concerns as every
+other phase.
 
 ### The Flow
 
 ```mermaid
 flowchart LR
-    Pick["Coordinator picks<br/>ready task(s)"]
-    Assess["Assesses task scope,<br/>assembles teams"]
-    Dispatch["Dispatches<br/>engineer(s)"]
+    Orch["Orchestrator picks<br/>ready task"]
+    Coord["Dispatches coordinator<br/>for this task"]
+    Assess["Coordinator assesses<br/>scope, selects engineer"]
     Code["Engineer implements:<br/>branch, code, tests"]
     CI{"CI green?<br/>(build + test + lint)"}
     CIFix["Engineer fixes<br/>CI failures"]
     PR["Creates PR<br/>(NOT draft)"]
+    CICheck{"CI green<br/>on PR?"}
+    Team["Coordinator assembles<br/>review team from<br/>PR scope + agent descriptions"]
     Review{"Review team<br/>PR comments?"}
     Address["Engineer addresses<br/>concerns"]
-    Merge["Merge PR,<br/>advance task"]
+    Merge["Coordinator merges PR,<br/>advances task"]
     Escalate["Escalate to<br/>stakeholder"]
 
-    Pick --> Assess --> Dispatch --> Code --> CI
+    Orch --> Coord --> Assess --> Code --> CI
     CI -->|"no"| CIFix --> CI
-    CI -->|"yes"| PR --> Review
+    CI -->|"yes"| PR --> CICheck
+    CICheck -->|"no"| CIFix
+    CICheck -->|"yes"| Team --> Review
     Review -->|"all approve"| Merge
     Review -->|"concerns"| Address --> CI
     Review -->|"3+ cycles"| Escalate
@@ -1268,16 +1296,20 @@ CI must pass before the review cycle begins. This is non-negotiable:
 - **Lint / format** — code meets project formatting and lint standards
 - **Type checks** — where applicable (TypeScript strict mode, mypy, etc.)
 
-The engineer runs these locally before creating the PR. CI runs again
-on the PR. If CI fails on the PR, the review team does not begin —
-the engineer fixes CI first. This prevents wasting reviewer time on
-code that doesn't build or pass tests.
+The engineer runs these locally before creating the PR. GitHub Actions
+runs CI again on the PR. The coordinator verifies CI status
+(`gh pr checks`) before assembling the review team. If CI fails on the
+PR, the review team does not begin — the engineer fixes CI first. This
+prevents wasting reviewer time on code that doesn't build or pass tests.
 
 After addressing review concerns, CI must pass again before re-review.
-Every round-trip through the review cycle includes a CI gate.
+Every round-trip through the review cycle includes a CI gate. The
+coordinator checks `gh pr checks` before each re-review dispatch.
 
-Build, test, and lint commands come from `repos.yaml` — each component
-repo declares its commands so agents don't guess.
+**CI check before merge applies to ALL phases** — not just implement.
+Before merging any PR (review, decompose, design, implement), the
+orchestrator or coordinator verifies CI is green via `gh pr checks`.
+A PR with failing CI is never merged.
 
 ### Sub-State Machine
 
@@ -1301,17 +1333,17 @@ stateDiagram-v2
     Done --> [*]
 ```
 
-| Orchestrator reads | Sub-state | Action |
+| Orchestrator reads (structured marker) | Sub-state | Action |
 |---|---|---|
-| No agent comments (task just created) | Ready for implementation | Coordinator dispatches engineer |
-| "claimed by [session]" | In progress | Skip — engineer is working |
-| "implementation complete, PR ready for review" | PR ready | Coordinator assembles + dispatches review team |
-| "PR under review" | PR under review | Wait for reviewers |
-| "PR reviewed, N concerns raised" | Needs changes | Engineer addresses concerns |
-| "PR reviewed, N concerns addressed — re-review requested" | PR ready (re-review) | Coordinator re-dispatches review team |
-| "PR reviewed, approved" | Approved | Merge PR, advance task |
-| "escalated to stakeholder" | Needs stakeholder | Stop for user engagement |
-| "blocked: amendment #NNN" | Blocked | Skip until amendment resolved |
+| No agent comments (task just created) | Ready for implementation | Dispatch coordinator for this task |
+| `**Status:** claimed by [session]` | In progress | Skip — engineer is working |
+| `**Status:** implementation complete, PR #NNN ready for review` | PR ready | Coordinator checks CI, assembles + dispatches review team |
+| `**Status:** PR under review` | PR under review | Wait for reviewers |
+| `**Status:** PR reviewed, N concerns raised` | Needs changes | Coordinator routes concerns to engineer |
+| `**Status:** PR reviewed, N concerns addressed — re-review requested` | PR ready (re-review) | Coordinator checks CI, re-dispatches review team |
+| `**Status:** PR reviewed, approved` | Approved | Coordinator checks CI, merges PR, advances task |
+| `**Status:** escalated to stakeholder` | Needs stakeholder | Stop for user engagement |
+| `**Status:** blocked: amendment #NNN` | Blocked | Skip until amendment resolved |
 
 ### Engineer Behaviour (Production Step)
 
@@ -1595,106 +1627,252 @@ targeted fix tasks in the relevant component repos at
 
 ### Orchestrator Integration
 
-The orchestrator handles `pipeline:implement` task issues. When it
-detects tasks at this stage:
+The orchestrator handles `pipeline:implement` task issues. Each task
+is an independent work item — the orchestrator dispatches coordinator
+once per task (same pattern as dispatching coordinator once per epic
+in design).
 
 1. **Orient** — read all task issues across component repos (from
    `repos.yaml`), check dependency graph, identify ready tasks
 2. **Decide** — which tasks are ready (dependencies met, not claimed,
-   not blocked)?
-3. **Execute** — dispatch coordinator to assemble team and brief
-   engineer for each ready task. In concurrent mode, multiple tasks
-   can be dispatched to separate sessions.
-4. **Update** — STATUS.md, epic progress, task states
+   not blocked)? Pick highest-priority ready task.
+3. **Execute** — dispatch coordinator for that single task. The
+   coordinator drives the full cycle (engineer dispatch, review,
+   merge). In concurrent mode (multiple terminals), each session
+   claims and drives one task independently.
+4. **Update** — STATUS.md, epic progress
 
 | What orchestrator sees | Sub-state | Action |
 |---|---|---|
-| Task with no agent comments, unclaimed | Ready | Dispatch coordinator → engineer |
+| Task with no agent comments, unclaimed | Ready | Dispatch coordinator for this task |
 | Task claimed by a session | In progress | Skip |
-| "implementation complete, PR ready for review" | PR ready | Dispatch coordinator → review team |
-| "PR reviewed, approved" | Approved | Merge, advance task |
-| "blocked: amendment #NNN" | Blocked | Skip until amendment resolved |
+| `**Status:** implementation complete, PR ready for review` | PR ready | Dispatch coordinator to manage review |
+| `**Status:** PR reviewed, approved` | Approved | Coordinator merges (after CI check) |
+| `**Status:** blocked: amendment #NNN` | Blocked | Skip — check if amendment is resolved (see Amendment Lifecycle) |
 | `needs-stakeholder-input` label | Waiting | Stop (autonomous) or engage user (interactive) |
-| All tasks for epic at `pipeline:done` | Epic complete | Coordinator runs integration check, advances epic |
+| All tasks for epic at `pipeline:done` | Epic complete | Dispatch coordinator for integration check, advance epic |
 
-### End-to-End: Implement
+#### Amendment Lifecycle Tracking
+
+When the orchestrator encounters a blocked task, it checks whether the
+blocking amendment issue is still open:
+
+```bash
+gh issue view [AMENDMENT_NUMBER] --repo [docs-repo] --json state
+```
+
+If the amendment is closed (resolved), the orchestrator removes the
+`blocked` label from the task issue and treats it as ready. This
+prevents tasks from staying permanently blocked after their amendment
+is resolved.
+
+#### Dependency Cycle Detection
+
+During design phase task decomposition, the coordinator validates that
+task dependencies form a directed acyclic graph (DAG). Before creating
+task issues, the coordinator checks:
+
+- No task depends on itself
+- No circular chains (A depends on B, B depends on C, C depends on A)
+
+If a cycle is detected, the coordinator escalates to the architect to
+re-examine task boundaries. This prevents silent deadlocks where tasks
+can never become ready.
+
+### End-to-End: Implement (single task)
 
 ```mermaid
 sequenceDiagram
-    participant O as Orchestrator / Coordinator
-    participant E as Engineer (stack-specific)
-    participant PR as Peer Engineer (reviewer)
-    participant A as Architect (reviewer)
-    participant SC as Spec Compliance (reviewer)
-    participant SP as Specialist Reviewers
+    participant Orch as Orchestrator
+    participant C as Project Coordinator
+    participant E as Engineer (selected dynamically)
+    participant R as Review Team (assembled dynamically)
     participant FS as File System
     participant GH as GitHub
     participant CI as CI Pipeline
 
-    Note over O: Coordinator identifies ready tasks
+    Note over Orch: ORCHESTRATOR — picks one ready task
 
-    O->>O: Reads task dependency graph,<br/>identifies unblocked tasks
-    O->>O: Assesses task scope,<br/>assembles impl + review teams
+    Orch->>Orch: Reads task issues across repos,<br/>checks dependencies, finds ready task
+    Orch->>C: Dispatches coordinator for task #N
+
+    Note over C,E: COORDINATOR — drives this task
+
+    C->>FS: Reads task issue, design doc,<br/>PRDs, repos.yaml
+    C->>FS: Reads repo manifest files<br/>(package.json, .csproj, etc.)
+    C->>FS: Reads agent descriptions to<br/>select appropriate engineer
+    C->>E: Dispatches engineer with context
 
     Note over E: PRODUCTION — Implementation
 
-    O->>E: Dispatches engineer with context:<br/>task, design doc, codebase location
     E->>GH: Claims task (claimed:[session-id] label)
-    E->>FS: Reads design doc, PRDs, existing codebase
+    E->>FS: Reads design doc, PRDs, existing codebase,<br/>other merged tasks for this epic
     E->>FS: Creates feature branch from main
     E->>FS: Implements code + writes tests
     E->>CI: Runs build + test + lint locally
     CI-->>E: All green
     E->>GH: Creates PR (NOT draft),<br/>references task + epic + design
-    E->>GH: Task comment: "implementation complete,<br/>PR ready for review"
+    E->>GH: Task comment:<br/>"**Status:** implementation complete,<br/>PR #NNN ready for review"
 
-    Note over O: REVIEW — PR Review Cycle
+    Note over C,R: REVIEW — PR Review Cycle
 
-    O->>O: Assembles review team<br/>based on task scope
-    O->>PR: Review code quality, patterns, tests
-    O->>A: Review design conformance,<br/>cross-epic integration
-    O->>SC: Review acceptance criteria,<br/>PRD traceability
-    O->>SP: Review domain-specific concerns<br/>(UX, security, DB, infra)
+    C->>CI: Checks gh pr checks — CI green?
+    C->>GH: Reads PR diff to assess scope
+    C->>FS: Reads agent descriptions to<br/>select appropriate reviewers
+    C->>R: Dispatches review team
 
-    PR->>GH: PR comments: code quality concerns
-    A->>GH: PR comments: design conformance
-    SC->>GH: PR comments: acceptance criteria gaps
-    SP->>GH: PR comments: domain-specific concerns
+    R->>GH: PR comments referencing standards<br/>(design doc, PRD, patterns, security)
 
-    alt All approve (no concerns)
-        PR->>GH: Approves PR
-        A->>GH: Approves PR
-        SC->>GH: Approves PR (final gate)
-        O->>GH: Merges PR (squash + delete branch)
-        O->>GH: Task comment: "PR reviewed, approved.<br/>PR merged."
-        O->>GH: Removes claimed label, closes task
-        O->>FS: Updates STATUS.md + epic progress
+    alt All approve
+        R->>GH: Approve PR
+        C->>CI: Verifies CI still green
+        C->>GH: Merges PR (squash + delete branch)
+        C->>GH: Task comment:<br/>"**Status:** PR reviewed, approved.<br/>PR merged."
+        C->>GH: Removes claimed label, closes task
     else Concerns raised
-        O->>E: Routes concerns to engineer
+        C->>E: Routes concerns to engineer
         E->>FS: Addresses concerns
         E->>CI: Runs build + test + lint
-        CI-->>E: All green
         E->>GH: Pushes to PR branch
-        E->>GH: Task comment: "PR reviewed,<br/>N concerns addressed —<br/>re-review requested"
-        Note over O: Coordinator re-dispatches<br/>review team. Repeats until<br/>approved or 3+ cycles.
-    else 3+ cycles without convergence
-        O->>GH: Task comment: "escalated to stakeholder"
-        O->>GH: Adds needs-stakeholder-input label
-        Note over O: Stops for user engagement
+        E->>GH: Task comment:<br/>"**Status:** PR reviewed,<br/>N concerns addressed —<br/>re-review requested"
+        C->>CI: Checks gh pr checks
+        C->>R: Re-dispatches review team
+        Note over C: Repeats until approved<br/>or 3+ cycles
+    else 3+ cycles
+        C->>GH: Task comment:<br/>"**Status:** escalated to stakeholder"
+        C->>GH: Adds needs-stakeholder-input label
     else Design gap discovered
         E->>GH: Creates amendment issue in docs repo
         E->>GH: Adds blocked label to task
-        E->>GH: Task comment: "blocked: amendment #NNN"
-        Note over O: Engineer moves to other tasks
+        E->>GH: Task comment:<br/>"**Status:** blocked: amendment #NNN"
     end
 
-    Note over O: EPIC COMPLETION CHECK
-    O->>O: All tasks for epic at pipeline:done?
-    O->>CI: Final integration check<br/>(build + test across repos)
-    O->>GH: Updates epic issue:<br/>"All tasks complete"
-    O->>GH: Epic → pipeline:deliver
-    O->>FS: Updates STATUS.md
+    Note over Orch: ORCHESTRATOR — checks epic progress
+
+    Orch->>Orch: All tasks for epic at pipeline:done?
+    alt Yes — epic complete
+        Orch->>C: Dispatches coordinator for<br/>integration check
+        C->>CI: Build + test across all repos
+        C->>GH: Updates epic issue:<br/>"All tasks complete"
+        C->>GH: Epic → pipeline:deliver
+    else No — more tasks remain
+        Orch->>Orch: Picks next ready task,<br/>dispatches coordinator
+    end
 ```
+
+---
+
+## Cross-Cutting: Structured State Markers
+
+All phases use GitHub issue comments to track sub-state. To make state
+detection reliable, all agents writing state transitions must use a
+**structured marker format**:
+
+```
+**Status:** [state text]
+```
+
+The orchestrator detects state by searching for the latest comment
+containing `**Status:**` and reading the text that follows. This is:
+- **Human-readable** — renders as bold text in GitHub
+- **Machine-parseable** — simple prefix match, not substring search
+- **Unambiguous** — "approved" in general text won't trigger a false
+  match; only `**Status:** PR reviewed, approved` does
+
+### Marker Format Rules
+
+1. Every state transition comment MUST include `**Status:**` as the
+   last meaningful line
+2. The status text must match one of the defined sub-state strings
+   for the current phase (see each phase's sub-state table)
+3. Additional context (summaries, lists, details) can appear above
+   the status line — the orchestrator reads the status line only
+4. Agents must not use `**Status:**` in non-state-transition comments
+
+### Example Comment
+
+```markdown
+## Review Team — Cycle 1
+
+**Product review:** All PRDs meet quality bar.
+**Technical review:** 2 items need clarification.
+
+**Auto-fixed:** 3 items
+**Needs stakeholder input:** 2 items
+
+### Items for stakeholder discussion:
+1. PRD-002: sync model ambiguity
+2. PRD-003: missing auth story
+
+**Status:** reviewed, 2 items need stakeholder input
+```
+
+The orchestrator reads: `reviewed, 2 items need stakeholder input`
+and dispatches the stakeholder facilitator.
+
+### Applies to All Phases
+
+This format applies to review, decompose, design, and implement
+phases — any comment that represents a state transition. The specific
+status strings for each phase are defined in their sub-state tables.
+
+---
+
+## Cross-Cutting: CI Check Before PR Merge
+
+Before merging **any** PR in **any** phase (review, decompose, design,
+implement), the coordinator or orchestrator must verify CI is green:
+
+```bash
+gh pr checks [PR_NUMBER] --repo [repo]
+```
+
+If any required check has failed, the PR is NOT merged. Instead:
+
+- For doc PRs (review, decompose, design): coordinator fixes the issue
+  (typically formatting/lint) and pushes, or routes to the sub-agent
+  who owns the content
+- For code PRs (implement): coordinator routes back to the engineer
+
+A PR with failing CI is never merged. This is a universal rule, not
+specific to any phase.
+
+---
+
+## Cross-Cutting: Repo Provisioning Gate
+
+Component repos must exist before task issues can be created in them.
+The design phase task decomposition step is where this is enforced.
+
+### During Design Phase Task Decomposition
+
+After the design PR is approved and merged, the coordinator decomposes
+into tasks. Before creating task issues in component repos:
+
+1. Read the design doc — identify which component repos are referenced
+2. For each referenced repo, verify it exists:
+   ```bash
+   gh repo view [owner/repo] --json name 2>/dev/null
+   ```
+3. If the repo exists: proceed with task creation
+4. If the repo does NOT exist: the coordinator provisions it
+   (via `/repo-provision` or directly with `gh repo create`) and
+   updates `repos.yaml` before creating tasks
+5. If repo provisioning fails: create an amendment issue and block
+   the epic's task decomposition
+
+### During Implement Phase (Lightweight Check)
+
+When the coordinator picks up a task, it verifies the target repo
+exists and is accessible before dispatching the engineer:
+
+```bash
+gh repo view [owner/repo] --json name 2>/dev/null
+```
+
+If the repo doesn't exist (missed during design), the coordinator
+creates an amendment issue targeting `pipeline:design` and blocks
+the task. This is a safety net, not the primary provisioning path.
 
 ---
 
@@ -1814,6 +1992,14 @@ sequenceDiagram
 | Epic completion includes final integration check | Coordinator verifies all tasks merged, all repos build and pass tests together. Creates fix tasks if integration issues found. |
 | Security-reviewer agent needed for implementation phase | OWASP, injection, auth, secrets, input validation. Every PR touching auth/user input/external integrations should include security review. |
 | Design phase specialist review gap identified | Coordinator defaults to architect-only review. Needs fix: coordinator must map epic scope to specialist involvement for both design production and PR review. |
+| Structured state markers (`**Status:**`) for all comment-based state transitions | Free-text comment parsing is fragile. Structured prefix makes detection reliable while keeping comments human-readable. Applied to ALL phases. |
+| CI check before ANY PR merge (all phases) | Prevents merging broken PRs. Coordinator/orchestrator runs `gh pr checks` before every merge — review, decompose, design, implement. Universal rule. |
+| Per-task coordinator dispatch in implement phase (not per-epic) | Matches the design phase pattern (one coordinator invocation per work item). Keeps coordinator context focused. Orchestrator manages higher-level coordination (task readiness, epic completion). |
+| Dynamic team assembly — no rigid stack-to-agent mapping | Coordinator reads repo context (manifest files, codebase) and agent descriptions to intelligently select engineers and reviewers. Same as a human tech lead assessing the work and selecting the right people. |
+| Repo provisioning gate in design phase task decomposition | Component repos must exist before task issues can be created. Coordinator verifies and provisions during task decomposition. Lightweight check also in implement phase as safety net. |
+| Amendment lifecycle tracking — orchestrator checks blocked tasks | When orchestrator encounters a blocked task, it checks if the blocking amendment is resolved (closed). If so, removes `blocked` label and treats task as ready. Prevents permanently stalled tasks. |
+| Dependency cycle detection during task decomposition | Coordinator validates task dependencies form a DAG before creating issues. Prevents silent deadlocks where tasks can never become ready. Escalates to architect if cycle found. |
+| ~~Coordinator role shifts to dispatch + track + integrate during implementation~~ | **Superseded:** Coordinator drives implementation per-task, same pattern as per-epic in design. No role shift — consistent pattern across all phases. |
 
 ---
 
@@ -1834,10 +2020,10 @@ sequenceDiagram
 | 11 | What does `repos.yaml` look like after init? | Template placeholder? Auto-populated with docs repo entry? |
 | 12 | Auto memory promotion mechanism — how and when? | V1: manual or orchestrator promotes. V2: might need sync to docs repo |
 | 13 | Do sub-agents need shared project context beyond their agent file? | Orchestrator passes context when spawning — is that sufficient? |
-| 14 | Security-reviewer agent — new agent or role within existing agents? | Could be a dedicated `.claude/agents/security-reviewer.md` or a review mode on engineer agents. Dedicated agent is cleaner but adds another agent to maintain. |
-| 15 | How does the coordinator discover task dependencies across component repos? | Task issues reference dependencies, but the coordinator needs to read issues across multiple repos. `repos.yaml` has repo list, but cross-repo issue querying is verbose with `gh`. |
-| 16 | Should implementation sessions use Ralph or be purely interactive? | Initial design says interactive (multiple terminals). Ralph with `--stage implement` could work too. May evolve — start interactive, add Ralph later. |
-| 17 | How does the coordinator know which specialists to include in implementation review? | Task issues should carry metadata about what they touch (UI, API, DB, etc.) from design phase decomposition. Or coordinator reads the PR diff and infers. Former is more reliable. |
-| 18 | What does `repos.yaml` need to include for implementation? | Currently has repo paths, stacks, dependencies. May also need: build commands, test commands, lint commands, so engineers and CI know what to run. |
-| 19 | How are concurrent sessions coordinated in practice? | User opens terminals manually. Should there be a script (like ralph.sh) that opens N sessions? Or is manual sufficient for V1? |
-| 20 | Peer engineer review — same agent type or different instance? | Engineer-dotnet reviewing another engineer-dotnet's work. Same agent definition, different invocation. Need to ensure the reviewer has fresh context, not the implementer's bias. |
+| 14 | ~~Security-reviewer agent — new agent or role within existing agents?~~ | **Answered:** Dedicated agent (`.claude/agents/security-reviewer.md`). Cleaner separation of concerns. Built. |
+| 15 | How does the coordinator discover task dependencies across component repos? | Task issues reference dependencies in their body. Coordinator reads each task issue across repos (from repos.yaml). Verbose but workable with `gh`. |
+| 16 | Should implementation sessions use Ralph or be purely interactive? | Initial design says interactive (multiple terminals). Ralph with `--stage implement` also supported. May evolve — start interactive, add Ralph later. |
+| 17 | ~~How does the coordinator know which specialists to include in implementation review?~~ | **Answered:** Coordinator reads PR diff and repo context dynamically, matches against agent descriptions. No metadata tags or rigid mapping. |
+| 18 | ~~What does `repos.yaml` need to include for implementation?~~ | **Answered:** repos.yaml stores repo paths, topology, and dependencies. CI is handled by GitHub Actions (repo's own `.github/workflows/`). Stack is inferred by coordinator reading the repo's manifest files. No additional fields needed. |
+| 19 | How are concurrent sessions coordinated in practice? | User opens terminals manually. Manual is sufficient for V1. |
+| 20 | Peer engineer review — same agent type or different instance? | Same agent definition, different invocation. Coordinator dispatches as reviewer with review-specific brief — fresh context, not implementer's session. |
