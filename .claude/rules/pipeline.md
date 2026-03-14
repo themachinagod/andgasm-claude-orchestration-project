@@ -409,8 +409,77 @@ Skip rules:
 
 ## State Update Protocol
 
-After every meaningful action:
-1. Update GitHub Issue with `**Status:**` marker comment
-2. Update `[DOCS_REPO]/STATUS.md`
-3. Update `[DOCS_REPO]/active-work/` epic file if applicable
-4. Commit: `status: [action summary] on #[issue]`
+Every meaningful action requires two updates: the GitHub Issue (source
+of truth for that work item) and STATUS.md (operational dashboard).
+
+### GitHub Issue Update
+
+Update the issue with a `**Status:**` marker comment (see Structured
+State Markers section above).
+
+### STATUS.md Updates (section-specific)
+
+STATUS.md is direct-to-main (operational state, not content):
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+# Update specific STATUS.md sections
+git add STATUS.md
+git commit -m "status: [action summary]"
+git push origin main
+cd ..
+```
+
+Update the **specific section** for the event — not the whole file:
+
+#### Session Events
+
+| Event | Section | Action |
+|-------|---------|--------|
+| Session starts | Active Sessions | Add row with session ID, task, timestamp |
+| Session ends normally | Active Sessions | Remove your row |
+| Session detects stale entry (>4 hours) | Active Sessions | Remove stale row, unclaim the work item |
+
+#### Task Events (Implement Phase)
+
+| Event | Section | Action |
+|-------|---------|--------|
+| Task claimed | In Flight | Add row (status: "In progress") |
+| PR created | In Flight | Update status to "PR created" |
+| PR under review | In Flight | Update status to "Under review" |
+| Review concerns raised | In Flight | Update status to "Addressing N concerns" |
+| PR approved + merged | In Flight → Recently Completed | Move row. Include notes (e.g., "auth API on main"). |
+| Task blocked | In Flight → Blocked | Move row with blocking reference |
+| Task unblocked | Blocked → In Flight | Move row back |
+
+#### Epic/Phase Events
+
+| Event | Section | Action |
+|-------|---------|--------|
+| Epic enters design | In Flight | Add row (type: design) |
+| Design approved, tasks created | In Flight → Recently Completed + In Flight | Move design to completed. Add tasks as ready. |
+| All epic tasks done | In Flight → Recently Completed | Move epic to completed. Update Phase in Overview. |
+| Phase transition | Project Overview | Update Phase field |
+
+#### Watch Items
+
+| When | Who | Action |
+|------|-----|--------|
+| Design change affects downstream | Architect or coordinator | Add watch item with context and "relevant until" condition |
+| Cross-repo dependency met | Coordinator | Add watch item noting what's now available |
+| Constraint discovered | Any agent | Add watch item with ordering/prerequisite note |
+| Condition met | Any agent noticing | Remove the watch item |
+
+#### Coordination Notes
+
+| Event | Section | Action |
+|-------|---------|--------|
+| Significant decision made | Key Decisions | Add row with date and context |
+| Risk identified | Risks & Concerns | Add row with severity and mitigation |
+| Risk resolved | Risks & Concerns | Update status to "Resolved" or remove |
+
+### active-work/ Updates
+
+Update `[DOCS_REPO]/active-work/` epic file if applicable — this is
+the detailed per-epic session log, separate from the STATUS.md snapshot.

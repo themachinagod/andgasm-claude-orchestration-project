@@ -1,11 +1,11 @@
 # Project Status
 
-> Agents read this first on every session and update it after every
-> meaningful action. This is the project heartbeat.
+> Agents read this FIRST on every session. Update LAST before ending.
+> This is a SNAPSHOT of current state — keep it current, not historical.
 
 ## Project Overview
 
-**Project Name:** [PROJECT_NAME]
+**Project:** [PROJECT_NAME]
 **Description:** [PROJECT_DESCRIPTION]
 **Account:** [GITHUB_ACCOUNT]
 **Phase:** Discovery (manual — writing PRDs)
@@ -21,31 +21,61 @@
 | Design | — | |
 | Implement | — | |
 
-## Active Work
+## Active Sessions
 
-| Issue | Title | Stage | Notes |
-|-------|-------|-------|-------|
+> Register here when starting work, deregister when done.
+> Stale entries (>4 hours, no updates) may indicate a crashed session —
+> treat the work item as unclaimed and remove the entry.
+
+| Session | Working On | Started | Status |
+|---------|-----------|---------|--------|
 | | | | |
+
+## In Flight
+
+> All work currently in progress across repos. Update when status changes.
+> Move to Recently Completed when done.
+
+| Item | Type | Repo | Status | Owner | Since |
+|------|------|------|--------|-------|-------|
+| | | | | | |
 
 ## Blocked
 
-| Issue | Title | Blocker | Since |
-|-------|-------|---------|-------|
+> Items that cannot proceed. Cross-reference the blocker. Remove when unblocked.
+
+| Item | Blocked By | Since | Notes |
+|------|-----------|-------|-------|
+| | | | |
+
+## Watch Items
+
+> Inter-agent coordination notes. Things other agents should know before
+> starting their work. Remove when the condition is met. Cap at ~10.
+
+| Note | Raised By | Context | Relevant Until |
+|------|----------|---------|---------------|
 | | | | |
 
 ## Recently Completed
 
-| Issue | Title | Completed | PR |
-|-------|-------|-----------|-----|
-| | | | |
+> Last 10 completed items. Oldest drop off when new ones are added.
+
+| Item | Completed | Notes |
+|------|-----------|-------|
+| | | |
 
 ## Key Decisions
 
-- [YYYY-MM-DD] Project initialised
+| Date | Decision | Context |
+|------|----------|---------|
+| [YYYY-MM-DD] | Project initialised | |
 
 ## Risks & Concerns
 
-- None identified yet
+| Risk | Severity | Mitigation | Status |
+|------|----------|-----------|--------|
+| None identified yet | | | |
 
 ## Last Updated
 

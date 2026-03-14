@@ -2013,6 +2013,206 @@ operates on an existing workspace, which already has `.claude/`.
 
 ---
 
+## Cross-Cutting: STATUS.md as Operational Dashboard
+
+STATUS.md serves two purposes:
+
+1. **Strategic** — where is the project? Current phase, key decisions,
+   risks, overall progress. This is what exists today.
+2. **Tactical** — what's happening right now? Active sessions, in-flight
+   work, blocked items, watch items for inter-agent coordination. This
+   is the extension.
+
+Both are needed. The strategic layer gives project-level context. The
+tactical layer enables concurrent agents to coordinate without checking
+every issue across every repo.
+
+### Principle: Snapshot, Not Log
+
+STATUS.md reflects **current state only**. It is not an append-only log.
+When something completes, it moves from "in flight" to "recently
+completed" and eventually drops off. When a watch item becomes
+irrelevant, it's removed. Agents read it for a current picture, not
+historical record. History lives in git, issue comments, and PR threads.
+
+### Extended Template Structure
+
+```markdown
+# Project Status
+
+> Agents read this FIRST on every session. Update LAST before ending.
+> This is a SNAPSHOT of current state — keep it current, not historical.
+
+## Project Overview
+
+**Project:** [name]
+**Description:** [one-line]
+**Account:** [github account]
+**Phase:** [current primary phase — e.g., "Implement (Epic: EPIC-3 User Auth)"]
+
+## Active Sessions
+
+| Session | Working On | Started | Status |
+|---------|-----------|---------|--------|
+
+> Agents register here when starting work, deregister when done.
+> If a session appears stale (started long ago, no updates), it may
+> have crashed — the work item should be treated as unclaimed.
+
+## In Flight
+
+| Item | Type | Repo | Status | Owner | Since |
+|------|------|------|--------|-------|-------|
+
+> All work currently in progress across all repos. Updated when work
+> starts, when status changes (PR created, under review, etc.), and
+> when work completes (moved to Recently Completed).
+
+## Blocked
+
+| Item | Blocked By | Since | Notes |
+|------|-----------|-------|-------|
+
+> Items that cannot proceed. Include the blocking reason and cross-
+> reference. Remove when unblocked.
+
+## Watch Items
+
+| Note | Raised By | Context | Relevant Until |
+|------|----------|---------|---------------|
+
+> Inter-agent coordination notes. Things other agents should know
+> about before starting their work. Each item has an expiry condition.
+> Remove when the condition is met or the item is no longer relevant.
+> Cap at ~10 items. If it's growing beyond that, items aren't being
+> cleaned up.
+
+## Recently Completed
+
+| Item | Completed | Notes |
+|------|-----------|-------|
+
+> Last 10 completed items. Oldest drop off when new ones are added.
+> Gives agents context on what just landed — useful for knowing what's
+> on main, what dependencies are now met, etc.
+
+## Key Decisions
+
+| Date | Decision | Context |
+|------|----------|---------|
+
+> Significant decisions made during the project. Append-only (these
+> are historical record). Link to ADRs where applicable.
+
+## Risks & Concerns
+
+| Risk | Severity | Mitigation | Status |
+|------|----------|-----------|--------|
+
+> Active risks. Remove or mark resolved when addressed.
+
+## Last Updated
+
+[ISO timestamp] by [agent/session]
+```
+
+### Update Protocol: When to Write What
+
+Every STATUS.md update follows the same git mechanic — direct to main
+(operational state, not content that requires PR review):
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+# Update STATUS.md sections
+git add STATUS.md
+git commit -m "status: [action summary]"
+git push origin main
+cd ..
+```
+
+#### Session Lifecycle
+
+| Event | Section to Update | What to Write |
+|-------|------------------|---------------|
+| **Session starts** | Active Sessions | Add row: session ID, what you're about to work on, timestamp, "starting" |
+| **Session ends** | Active Sessions | Remove your row |
+| **Session crashes** | (none — next session cleans up stale entries) | |
+
+#### Task Lifecycle (Implement Phase)
+
+| Event | Sections to Update | What to Write |
+|-------|-------------------|---------------|
+| **Task claimed** | In Flight, Active Sessions | Add task to In Flight (status: "In progress"). Update Active Sessions with task reference. |
+| **PR created** | In Flight | Update status to "PR created, CI running" |
+| **CI passes, review starts** | In Flight | Update status to "PR under review" |
+| **Review concerns raised** | In Flight | Update status to "Addressing N review concerns" |
+| **PR approved and merged** | In Flight → Recently Completed | Move task from In Flight to Recently Completed. Include any notes (e.g., "auth endpoints now on main"). |
+| **Task blocked** | In Flight → Blocked | Move task from In Flight to Blocked with blocking reason. |
+| **Task unblocked** | Blocked → In Flight | Move back to In Flight. |
+
+#### Design/Decompose Phases
+
+| Event | Sections to Update | What to Write |
+|-------|-------------------|---------------|
+| **Epic enters design** | In Flight | Add epic (type: design, status: "Team assembling") |
+| **Design PR created** | In Flight | Update status to "Design PR under review" |
+| **Design approved, tasks created** | In Flight → Recently Completed, In Flight | Move design to Recently Completed. Add new tasks to In Flight (status: "Ready"). |
+| **Epic fully implemented** | In Flight → Recently Completed | Move epic to Recently Completed. Update Phase in Project Overview. |
+
+#### Watch Items
+
+| When | Who | Example |
+|------|-----|---------|
+| Design change affects downstream tasks | Architect or coordinator | "API contract for user auth changed — added refresh token endpoint. Tasks #8 and #10 should read updated contract before implementing." |
+| Cross-repo dependency met | Coordinator | "Shared library v1.0.0 published to npm. Consumer repos can now add dependency." |
+| Migration ordering constraint | Database-engineer or coordinator | "Users table migration (task #7) must merge before any task reading user model." |
+| Infrastructure change | DevOps-engineer | "CI pipeline updated — all repos now require lint pass. Existing PRs may need rebase." |
+
+Watch items are cleaned up by whichever agent notices the condition is
+met. The coordinator should also review watch items when checking task
+readiness — if a watch item says "relevant until task #8 picks up the
+change" and task #8 is being dispatched, the coordinator includes the
+watch item in the engineer's brief.
+
+### Hygiene Rules
+
+1. **Read first, write last** — every session reads STATUS.md at the
+   start and updates it at the end. Non-negotiable.
+2. **Recently Completed caps at 10** — when adding the 11th, remove
+   the oldest.
+3. **Watch Items cap at ~10** — if growing beyond that, items aren't
+   being cleaned up. Review and remove resolved ones.
+4. **Stale session detection** — if an Active Sessions entry is older
+   than 4 hours with no status change, treat it as crashed. The next
+   agent to notice removes the stale entry and treats the work item
+   as unclaimed.
+5. **Blocked items always have a cross-reference** — "Blocked By"
+   must reference a specific issue number or condition.
+6. **Phase field stays current** — Project Overview phase should
+   reflect the primary activity (e.g., "Design" when most epics are
+   in design, "Implement" when tasks are being coded).
+
+### How This Integrates With Existing Mechanics
+
+STATUS.md is a **coordination layer on top of** the existing pipeline
+mechanics. It does not replace anything:
+
+| Mechanism | Purpose | Still Used? |
+|-----------|---------|-------------|
+| GitHub Issues + labels | Authoritative work tracking, pipeline state | Yes — source of truth for task state |
+| `**Status:**` comments | Sub-state detection by orchestrator | Yes — how orchestrator decides what to do |
+| PR comments | Review feedback and discussion | Yes — how review cycles work |
+| repos.yaml | Repo topology and dependencies | Yes — how agents find repos |
+| active-work/ | Per-epic session logs | Yes — detailed session history |
+| **STATUS.md** | **Operational snapshot for agent coordination** | **Extended — strategic + tactical** |
+
+The orchestrator still reads issues and comments to determine pipeline
+state. STATUS.md gives it (and all agents) a quick summary of the
+broader context without querying every issue across every repo.
+
+---
+
 ## Known Gap: Design Phase Specialist Review Coverage
 
 > Observed during testing: the design phase coordinator tends to
@@ -2133,6 +2333,11 @@ operates on an existing workspace, which already has `.claude/`.
 | Upgrade is NOT a global skill | Unlike `/initialise-workspace`, it operates on an existing workspace that already has `.claude/`. Ships with the template. First upgrade may need manual skill file placement. |
 | Label sync is additive, not destructive | Upgrade creates/updates template labels but does not delete project-created labels (like `initiative:*`). Removed template labels are flagged for manual review. |
 | Upgrade is safe at any pipeline stage | New agents/rules take effect on next cycle. Old-format comments are history. In-flight work transitions naturally. |
+| STATUS.md extended with tactical sections (Active Sessions, In Flight, Watch Items, Recently Completed) | Concurrent agents need a shared operational view without querying every issue across every repo. STATUS.md is already read first by every session — extending it is the simplest coordination mechanism. |
+| STATUS.md is a snapshot, not a log | Prevents staleness. Current state only — items move between sections and drop off when resolved. History lives in git and issue comments. |
+| Watch Items for inter-agent coordination | Lightweight structured notes with context and expiry. Agents write things other agents should know. Cleaned up when condition is met. Caps at ~10. |
+| Stale session detection at 4 hours | If an Active Sessions entry has no status change in 4 hours, treat as crashed. Next agent cleans up and unclaims the work item. |
+| STATUS.md update protocol is section-specific | "Update STATUS.md" is too vague — agents need to know which section to update at which pipeline event. Protocol maps events to sections. |
 | Structured state markers (`**Status:**`) for all comment-based state transitions | Free-text comment parsing is fragile. Structured prefix makes detection reliable while keeping comments human-readable. Applied to ALL phases. |
 | CI check before ANY PR merge (all phases) | Prevents merging broken PRs. Coordinator/orchestrator runs `gh pr checks` before every merge — review, decompose, design, implement. Universal rule. |
 | Per-task coordinator dispatch in implement phase (not per-epic) | Matches the design phase pattern (one coordinator invocation per work item). Keeps coordinator context focused. Orchestrator manages higher-level coordination (task readiness, epic completion). |

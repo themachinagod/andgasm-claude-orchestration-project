@@ -32,7 +32,7 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
 
 ### Phase 1: Orient
 
-1. Read `[DOCS_REPO]/STATUS.md` — project-level source of truth
+1. Read `[DOCS_REPO]/STATUS.md` — check Active Sessions for stale entries (>4 hours), review Watch Items for context that affects this cycle, review In Flight and Blocked for current work state
 2. Read `[DOCS_REPO]/repos.yaml` — understand repo topology
 3. Check for open pipeline issues across all stages:
    ```bash
@@ -257,7 +257,8 @@ gh issue comment [NUMBER] --body "PRDs approved and merged. Issue advanced to pi
 **Status:** approved, PR merged, advanced to decompose"
 ```
 
-Update STATUS.md:
+Update STATUS.md: move review issue from In Flight to Recently Completed. Update Phase in Project Overview if applicable.
+
 ```bash
 git add STATUS.md
 git commit -m "status: PRDs approved, advancing to decompose — #[NUMBER]"
@@ -344,7 +345,7 @@ Roadmap merged: docs/planning/roadmap.md
 gh issue close [NUMBER]
 ```
 
-Update STATUS.md:
+Update STATUS.md: move decompose issue to Recently Completed. Add epic issues to In Flight (type: design, status: Ready). Update Phase to 'Design'.
 
 ```bash
 git checkout main && git pull origin main
@@ -485,6 +486,8 @@ Design PR merged. Tasks created:
 When "tasks created" is detected, advance the epic. The epic issue
 stays open as a tracking umbrella — individual task issues drive
 implementation.
+
+Update STATUS.md: move epic design to Recently Completed. Add tasks to In Flight (type: implement, status: Ready). Update Phase to 'Implement' if applicable.
 
 ##### Sub-state: Needs Stakeholder Input
 
@@ -772,6 +775,8 @@ cd ..
 
 Remove any `claimed:*` label.
 
+Update STATUS.md: move task from In Flight to Recently Completed with notes about what merged.
+
 After merging, check if all tasks for the parent epic are now done:
 
 ```bash
@@ -864,7 +869,7 @@ For any other `pipeline:*` stage:
 
 After execution:
 
-1. Update `[DOCS_REPO]/STATUS.md` with what was done (if not already done above)
+1. Update STATUS.md sections as appropriate for the action taken (see pipeline.md State Update Protocol for section-specific guidance)
 2. Ensure all commits are pushed
 
 ### Detecting Interactive vs. Autonomous
