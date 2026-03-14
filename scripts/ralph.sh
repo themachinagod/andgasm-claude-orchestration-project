@@ -6,11 +6,13 @@
 # picks the highest-priority action, executes it, updates state, and exits.
 # The next session reads state from files and GitHub and continues.
 #
-# Handles all implemented pipeline stages (review, decompose).
+# Handles all implemented pipeline stages (review, decompose, design).
 # Runs /orchestrate which dispatches to the correct stage logic.
+# Supports stage filtering for parallel operation.
 #
 # Usage:
-#   ./ralph.sh                    # run from workspace root
+#   ./ralph.sh                    # run from workspace root (all stages)
+#   ./ralph.sh --stage design     # only handle pipeline:design issues
 #   ./ralph.sh --max-cycles 10    # limit to 10 cycles
 #   ./ralph.sh --dry-run          # show what would run without executing
 #
@@ -31,9 +33,11 @@ MAX_TURNS=0         # 0 = unlimited claude tool-use turns per cycle
 TIMEOUT=0           # 0 = no wall-clock timeout per cycle
 DRY_RUN=false
 PAUSE_BETWEEN=15    # seconds between cycles
+STAGE_FILTER=""     # empty = all stages; set via --stage
 CYCLE=0
 CONSECUTIVE_FAILURES=0
 MAX_CONSECUTIVE_FAILURES=3
+SESSION_ID="ralph-$(date '+%Y%m%dT%H%M%S')-$"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -57,6 +61,10 @@ while [[ $# -gt 0 ]]; do
             TIMEOUT="$2"
             shift 2
             ;;
+        --stage)
+            STAGE_FILTER="$2"
+            shift 2
+            ;;
         --help|-h)
             echo "Usage: ralph.sh [OPTIONS]"
             echo ""
@@ -64,6 +72,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --max-cycles N    Stop after N cycles (default: unlimited)"
             echo "  --max-turns N     Claude tool-use turns per cycle (default: unlimited)"
             echo "  --timeout SECS    Wall-clock timeout per cycle in seconds (default: none)"
+            echo "  --stage STAGE     Only handle this pipeline stage (e.g., review, design, implement)"
             echo "  --pause SECONDS   Pause between cycles (default: 15)"
             echo "  --dry-run         Show what would run without executing"
             echo ""
@@ -189,15 +198,32 @@ print(count)
     return 1
 }
 
-PROMPT='You are in an AUTONOMOUS session (Ralph). The user is NOT present.
+build_prompt() {
+    local prompt='You are in an AUTONOMOUS session (Ralph). The user is NOT present.
+Session ID: '"$SESSION_ID"'
 Read CLAUDE.md for operating instructions.
 
 Run /orchestrate to:
 1. Orient: read STATUS.md, repos.yaml, GitHub Issues and PRs
 2. Determine the pipeline stage and sub-state for open issues
-3. Execute the appropriate action (dispatch agent teams for review, decompose, etc.)
+3. Execute the appropriate action (dispatch agent teams for review, decompose, design, etc.)
 4. Update all state (STATUS.md, issue labels, issue comments)
-5. Stop after completing one action cycle
+5. Stop after completing one action cycle'
+
+    if [ -n "$STAGE_FILTER" ]; then
+        prompt="$prompt"'
+
+STAGE FILTER: Only handle issues at pipeline:'"$STAGE_FILTER"'. Skip all other
+pipeline stages regardless of priority. This session is dedicated to the
+'"$STAGE_FILTER"' stage only.'
+    fi
+
+    prompt="$prompt"'
+
+ISSUE CLAIMING: Before starting work on any issue, add label
+"claimed:'"$SESSION_ID"'" to claim it. Skip issues that already have
+a "claimed:" label from another session. Remove your claim label when
+work on the issue is complete.
 
 If stakeholder input is needed:
 - Add the needs-stakeholder-input label to the issue
@@ -210,6 +236,11 @@ If nothing is actionable (no open pipeline issues, or all waiting on stakeholder
 
 IMPORTANT: You must persist all state before stopping. The next session has
 no memory — files and GitHub state are all it has.'
+
+    echo "$prompt"
+}
+
+PROMPT=$(build_prompt)
 
 run_cycle() {
     CYCLE=$((CYCLE + 1))
@@ -224,23 +255,30 @@ run_cycle() {
     local start_time
     start_time=$(date +%s)
 
-    local cmd=(claude --print "$PROMPT" --directory "$WORKSPACE_ROOT")
+    # Run claude with prompt as positional argument.
+    # IMPORTANT: Do NOT pipe stdout (| while read, | tee, etc.) — piping
+    # makes Claude detect a non-TTY and switch to API mode, which requires
+    # an API key even on Max subscriptions. Let Claude own the terminal.
+    # Output is captured via a log file instead.
+    local log_file="/tmp/ralph-cycle-${CYCLE}.log"
+    local cmd=(claude --verbose --dangerously-skip-permissions)
+    local cmd_args=()
 
     if [ "$MAX_TURNS" -gt 0 ]; then
-        cmd+=(--max-turns "$MAX_TURNS")
+        cmd_args+=(--max-turns "$MAX_TURNS")
     fi
 
+    # Prompt goes as the final positional argument
+    cmd_args+=("$PROMPT")
+
+    local exit_code
     if [ "$TIMEOUT" -gt 0 ]; then
-        timeout "$TIMEOUT" "${cmd[@]}" 2>&1 | while IFS= read -r line; do
-            echo "  $line"
-        done
+        timeout "$TIMEOUT" "${cmd[@]}" "${cmd_args[@]}"
+        exit_code=$?
     else
-        "${cmd[@]}" 2>&1 | while IFS= read -r line; do
-            echo "  $line"
-        done
+        "${cmd[@]}" "${cmd_args[@]}"
+        exit_code=$?
     fi
-
-    local exit_code=${PIPESTATUS[0]}
 
     if [ $exit_code -eq 124 ]; then
         log "Cycle hit wall-clock timeout (${TIMEOUT}s) — state should be saved, continuing"
@@ -256,8 +294,37 @@ run_cycle() {
 
 # --- Main ---
 
+cleanup_claims() {
+    local docs_repo_id
+    docs_repo_id=$(cd "$DOCS_REPO_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo '')
+    if [ -z "$docs_repo_id" ]; then
+        return
+    fi
+
+    local claimed_issues
+    claimed_issues=$(gh issue list \
+        --repo "$docs_repo_id" \
+        --label "claimed:$SESSION_ID" \
+        --state open \
+        --json number \
+        --jq '.[].number' 2>/dev/null || echo '')
+
+    if [ -n "$claimed_issues" ]; then
+        log "Cleaning up claim labels for session $SESSION_ID"
+        echo "$claimed_issues" | while read -r issue_num; do
+            if [ -n "$issue_num" ]; then
+                gh issue edit "$issue_num" \
+                    --repo "$docs_repo_id" \
+                    --remove-label "claimed:$SESSION_ID" 2>/dev/null || true
+            fi
+        done
+    fi
+}
+
 log "Starting Ralph loop"
+log "Session ID:   $SESSION_ID"
 log "Workspace:    $WORKSPACE_ROOT"
+log "Stage filter: $([ -z "$STAGE_FILTER" ] && echo 'all stages' || echo "pipeline:$STAGE_FILTER only")"
 log "Max cycles:   $([ $MAX_CYCLES -eq 0 ] && echo 'unlimited' || echo $MAX_CYCLES)"
 log "Max turns:    $([ $MAX_TURNS -eq 0 ] && echo 'unlimited' || echo $MAX_TURNS) per cycle"
 log "Timeout:      $([ $TIMEOUT -eq 0 ] && echo 'none' || echo "${TIMEOUT}s") per cycle"
@@ -265,6 +332,8 @@ log "Pause:        ${PAUSE_BETWEEN}s between cycles"
 log ""
 
 check_prerequisites
+
+trap 'cleanup_claims; log "Ralph interrupted. Claims cleaned up."' EXIT INT TERM
 
 log "Docs repo:    $DOCS_REPO_DIR"
 log ""
@@ -296,9 +365,12 @@ while true; do
         if [ $CONSECUTIVE_FAILURES -ge $MAX_CONSECUTIVE_FAILURES ]; then
             log "Error: $MAX_CONSECUTIVE_FAILURES consecutive failures. Stopping."
             log "Check STATUS.md and recent session logs for details."
+            cleanup_claims
             break
         fi
     fi
+
+    cleanup_claims
 
     log "Pausing ${PAUSE_BETWEEN}s before next cycle..."
     sleep "$PAUSE_BETWEEN"
