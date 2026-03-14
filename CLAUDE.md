@@ -51,6 +51,12 @@ Two Claude instances running concurrently will have different session
 IDs. Never assume you are the same session as a previous or concurrent
 instance — always use the session ID from YOUR startup output.
 
+When multiple sessions work on different tasks in the same component
+repo, the orchestrator dispatches each coordinator in a **git worktree**
+(isolated working directory). This prevents filesystem and git index
+collisions between concurrent sessions. See git-conventions rule for
+details.
+
 ## First Action on Every Session
 
 Note your session ID from the startup hook output, then run `/orient`

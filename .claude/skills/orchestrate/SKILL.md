@@ -755,9 +755,30 @@ git push origin main
 cd ..
 ```
 
-**Only after claiming succeeds**, dispatch the `project-coordinator`:
+**Only after claiming succeeds**, dispatch the `project-coordinator`
+**using worktree isolation** to prevent filesystem collisions with other
+sessions working on the same repo:
+
+```
+Agent(
+  prompt: [coordinator brief below],
+  subagent_type: "project-coordinator",
+  isolation: "worktree"
+)
+```
+
+The worktree is created from the component repo's current `main`. The
+coordinator and all its sub-agents (engineer, reviewers) operate in the
+isolated worktree directory. This ensures each session has its own
+working directory, index, and HEAD — no interference with concurrent
+sessions on the same repo.
+
+Coordinator brief:
 
 - "Task #[NUMBER] in [repo-name] is at pipeline:implement and ready."
+- "You are operating in a git worktree — an isolated copy of the repo.
+  Git commands work normally. Use `--repo [owner/repo]` for all `gh`
+  commands. Read docs repo content via absolute path: `[DOCS_REPO]/`."
 - "Read the task issue for scope, acceptance criteria, and quality gates."
 - "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
 - "Read the component repo's manifest files (package.json, *.csproj,
@@ -786,9 +807,12 @@ cd ..
 This sub-state is handled by the same coordinator invocation that
 started the task. If the orchestrator encounters a task at this
 sub-state without an active coordinator (e.g., session interrupted),
-re-dispatch the `project-coordinator` to pick up from the review cycle:
+re-dispatch the `project-coordinator` **with worktree isolation**
+to pick up from the review cycle:
 
 - "Task #[NUMBER] in [repo-name] has a PR ready for review."
+- "You are operating in a git worktree. Use `--repo [owner/repo]` for
+  all `gh` commands. Read docs repo content via absolute path."
 - "Verify CI is green: `gh pr checks [PR_NUMBER] --repo [owner/repo] --required --fail`"
 - "If CI fails, route back to the engineer to fix."
 - "Read the PR diff, repo manifest files, and agent descriptions to
@@ -798,9 +822,12 @@ re-dispatch the `project-coordinator` to pick up from the review cycle:
 
 ##### Sub-state: Needs Changes (concerns raised)
 
-The coordinator routes review concerns to the implementation engineer:
+Re-dispatch the coordinator **with worktree isolation** to route review
+concerns to the implementation engineer:
 
 - "PR #[NUMBER] in [repo-name] has reviewer concerns."
+- "You are operating in a git worktree. Use `--repo [owner/repo]` for
+  all `gh` commands. Read docs repo content via absolute path."
 - "Route the concerns to the implementation engineer."
 - "The engineer addresses concerns, ensures CI passes, pushes to the
   PR branch, and updates the task issue with:
@@ -808,8 +835,8 @@ The coordinator routes review concerns to the implementation engineer:
 
 ##### Sub-state: Re-review Needed
 
-Re-dispatch the coordinator to re-dispatch the review team (or the
-subset whose concerns were addressed).
+Re-dispatch the coordinator **with worktree isolation** to re-dispatch
+the review team (or the subset whose concerns were addressed).
 
 ##### Sub-state: Approved (all reviewers approve)
 
