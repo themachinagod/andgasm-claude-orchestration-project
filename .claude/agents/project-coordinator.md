@@ -303,11 +303,14 @@ Report to the orchestrator that stakeholder input is needed.
 #### Step 7: On Approval — Create Epic Issues
 
 After the orchestrator merges the PR, create epic issues in the docs
-repo. Use the epic issue template structure:
+repo. First verify CI is green:
 
 ```bash
 cd [DOCS_REPO]
+gh pr checks [PR_NUMBER] --required --fail
 ```
+
+Use the epic issue template structure:
 
 For each epic in the roadmap:
 
@@ -362,7 +365,9 @@ Created [N] epic issues at pipeline:design:
 - #[N2]: [title]
 ...
 
-Roadmap: docs/planning/roadmap.md (merged)"
+Roadmap: docs/planning/roadmap.md (merged)
+
+**Status:** decomposition complete, [N] epics created"
 
 gh issue close [DECOMPOSE_ISSUE]
 cd ..
@@ -653,12 +658,13 @@ Report to the orchestrator that stakeholder input is needed.
 
 #### Step 7: On Approval — Task Decomposition (Same Session)
 
-After all reviewers approve, merge the design PR and immediately
-decompose into implementation tasks. Do this in the same session —
-the sub-agents' context is fresh and valuable.
+After all reviewers approve, verify CI and merge the design PR, then
+immediately decompose into implementation tasks. Do this in the same
+session — the sub-agents' context is fresh and valuable.
 
 ```bash
 cd [DOCS_REPO]
+gh pr checks [PR_NUMBER] --required --fail
 gh pr merge [PR_NUMBER] --squash --delete-branch
 ```
 
@@ -693,7 +699,51 @@ conventions/patterns only), invoke the `architect` instead:
 Take the engineer/architect task proposals and **assemble the final
 task list**. This is your job — you sequence across repos, resolve
 cross-repo dependencies, ensure consistent sizing, and create the
-issues:
+issues.
+
+**7a. Verify Component Repos Exist**
+
+Before creating any task issues, verify that every component repo
+referenced in the design actually exists:
+
+```bash
+gh repo view [owner/repo] --json name 2>/dev/null
+```
+
+For each component repo in the design:
+- If the repo exists, proceed
+- If the repo does not exist, either provision it (via `/repo-provision`
+  skill or equivalent) or raise a blocker issue:
+  ```bash
+  cd [DOCS_REPO]
+  gh issue create --title "Blocker: repo [owner/repo] does not exist" \
+    --label "type:amendment,blocker,pipeline:design" \
+    --body "Design for EPIC-NNN references [owner/repo] but the repo
+  does not exist. Must be provisioned before tasks can be created.
+
+  Blocks: #[EPIC_NUMBER]"
+  cd ..
+  ```
+  Do not create task issues for repos that do not exist.
+
+**7b. Validate Dependency DAG**
+
+Before creating task issues, validate that the proposed task
+dependencies form a directed acyclic graph (DAG). Walk the dependency
+edges and confirm no circular dependencies exist.
+
+If a cycle is detected:
+- Do not create the task issues
+- Escalate to the `architect` sub-agent:
+  - "The proposed task decomposition for EPIC-NNN has a circular
+    dependency: [describe the cycle, e.g., Task A depends on Task B
+    depends on Task C depends on Task A]."
+  - "Re-examine the task boundaries and propose a revised decomposition
+    that eliminates the cycle."
+- Take the architect's revised proposal and re-validate before
+  proceeding
+
+**7c. Create Task Issues**
 
 Create task issues in the appropriate component repos:
 
@@ -779,47 +829,60 @@ The orchestrator picks this up and sends the epic back to
 
 ## Implement Phase Role (Primary)
 
-When invoked during `pipeline:implement`, you drive the implementation
-phase at the epic level. Your role shifts from "drive each work item"
-(as in design) to **dispatch, track, and integrate**. Individual tasks
-are engineer-led. You coordinate the overall effort.
+When invoked during `pipeline:implement`, you drive a **single task**
+through the full implementation cycle. The orchestrator dispatches you
+once per task — same pattern as design phase (once per epic). You read
+context, select the engineer dynamically, manage the review cycle,
+and merge on approval.
 
-**You do not write code.** Engineers implement. You dispatch tasks,
-assemble review teams, route review concerns, track epic progress, and
-verify integration.
+**You do not write code.** Engineers implement. You select the right
+engineer, assemble review teams, route review concerns, and manage
+the PR lifecycle for the task you are given.
 
 ### Process
 
-#### Step 1: Identify Ready Tasks
+#### Step 1: Read Context
 
-Read the task issues across component repos for the epic:
+You receive a single task to drive. Read the context needed to
+coordinate it:
 
 ```bash
 cd [DOCS_REPO]
 ```
 
-- Read the epic issue — get the list of linked task issues
-- Read `repos.yaml` — get component repo paths
-- For each component repo, check task issues at `pipeline:implement`:
-  ```bash
-  gh issue list --repo [owner/repo] --label "pipeline:implement" \
-    --state open --json number,title,labels,body
-  ```
-- Check the dependency graph (from task issue bodies — each task
-  lists its dependencies)
-- Identify which tasks are **ready**: dependencies met, not claimed,
-  not blocked
+- Read `repos.yaml` — repo manifest files, technology indicators,
+  agent descriptions, component repo paths
+- Read the task issue — scope, acceptance criteria, quality gates,
+  dependencies, linked epic
+- Read the epic issue — get the design doc path and PRD references
+- Read the design doc at `docs/architecture/[epic-name]/`
 
 ```bash
 cd ..
 ```
 
-#### Step 2: Dispatch Engineers
+Read the target component repo to understand current codebase state:
 
-For each ready task, dispatch the appropriate engineer sub-agent based
-on the component repo's stack (from `repos.yaml`):
+```bash
+cd [component-repo]
+```
 
-**Invoke engineer sub-agent:**
+- Read manifest files (package.json, .csproj, pyproject.toml, etc.)
+  to confirm technology stack
+- Read agent description files if present
+
+```bash
+cd ..
+```
+
+#### Step 2: Select and Dispatch Engineer
+
+Dynamically select the engineer sub-agent. Read the repo's technology
+indicators (from manifest files and `repos.yaml`) and match against
+available engineer agent descriptions. Do not use a static lookup
+table — assess the repo and select the best-fit engineer.
+
+**Invoke the selected engineer sub-agent:**
 
 - "Task #[NUMBER] in [repo-name] is ready for implementation."
 - "Read the task issue for scope, acceptance criteria, and quality gates."
@@ -827,15 +890,21 @@ on the component repo's stack (from `repos.yaml`):
 - "Read the existing codebase in [repo-path]."
 - "Create a feature branch, implement, write tests, ensure CI passes
   (build + test + lint), create a PR (NOT draft), and update the task
-  issue: 'implementation complete, PR #NNN ready for review'."
+  issue with a comment including:
+  `**Status:** implementation complete, PR #NNN ready for review`"
 
-When multiple ready tasks target different repos, dispatch engineers
-in parallel.
+#### Step 3: CI Check and Review Team Assembly
 
-#### Step 3: Assemble and Dispatch Review Team
+When the engineer reports implementation complete, verify CI passes
+before assembling the review team:
 
-When an engineer reports "implementation complete, PR ready for review",
-assemble the review team.
+```bash
+cd [component-repo]
+gh pr checks [PR_NUMBER] --required --fail
+cd ..
+```
+
+If CI fails, route back to the engineer to fix before proceeding.
 
 Read the PR to understand what changed:
 
@@ -845,9 +914,15 @@ gh pr view [PR_NUMBER] --json files,body
 cd ..
 ```
 
-Based on what the PR touches, assemble the review team dynamically:
+Dynamically assemble the review team. Read the PR diff, the repo
+manifest, and agent descriptions to select reviewers based on what
+the PR actually touches. Do not use a static lookup table — match
+PR content to agent capabilities.
 
-- **Peer engineer** (always) — same stack type as the implementer
+**Guiding principles for reviewer selection:**
+
+- **Peer engineer** (always) — a second engineer of the same stack
+  type for code quality, patterns, test quality
 - **Architect** — if the task touches APIs, integration points, or
   shared concerns
 - **Frontend-architect** — if the task touches UI components
@@ -858,6 +933,7 @@ Based on what the PR touches, assemble the review team dynamically:
   external integrations, or data storage
 - **Spec-compliance** (final gate) — if the task is linked to PRD
   acceptance criteria
+- **Lightweight path** — not every task needs every reviewer
 
 Dispatch reviewers in parallel:
 
@@ -867,6 +943,19 @@ For each reviewer:
 - "Read the design doc at `[DOCS_REPO]/docs/architecture/[epic-name]/`."
 - "Leave specific PR comments for any concerns, referencing the standard
   you check against. Approve if your domain is sound."
+
+Update the task issue:
+
+```bash
+cd [component-repo]
+gh issue comment [TASK_NUMBER] --body "## Review Dispatched
+
+Review team: [list reviewers and their roles]
+PR: #[PR_NUMBER]
+
+**Status:** PR under review"
+cd ..
+```
 
 #### Step 4: Route Concerns to Engineer
 
@@ -883,22 +972,37 @@ engineer:
 
 - "PR comments from reviewers: [summary of concerns]"
 - "Address these concerns, ensure CI passes, push to the PR branch,
-  and update the task issue: 'PR reviewed, N concerns addressed —
-  re-review requested'"
+  and update the task issue with a comment including:
+  `**Status:** PR reviewed, N concerns addressed — re-review requested`"
+
+After the engineer addresses concerns, verify CI again before
+re-dispatching reviewers:
+
+```bash
+cd [component-repo]
+gh pr checks [PR_NUMBER] --required --fail
+cd ..
+```
 
 Then re-dispatch the relevant reviewers for re-review.
 
 #### Step 5: On Approval — Merge and Advance
 
-When all required reviewers approve:
+When all required reviewers approve, verify CI one final time before
+merging:
 
 ```bash
 cd [component-repo]
+gh pr checks [PR_NUMBER] --required --fail
 gh pr merge [PR_NUMBER] --squash --delete-branch
 gh issue edit [TASK_NUMBER] \
   --remove-label "pipeline:implement" \
   --add-label "pipeline:done"
-gh issue comment [TASK_NUMBER] --body "PR reviewed, approved. PR merged."
+gh issue comment [TASK_NUMBER] --body "## Task Complete
+
+PR #[PR_NUMBER] merged.
+
+**Status:** PR reviewed, approved"
 gh issue close [TASK_NUMBER]
 cd ..
 ```

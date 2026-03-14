@@ -170,7 +170,7 @@ Missing API contracts, unclear data models, unspecified cross-service behavior:
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: architecture missing [what]" \
-  --label "type:amendment,pipeline:needs-architecture,blocker" \
+  --label "type:amendment,pipeline:design,blocker" \
   --body "Blocks #[task-issue]. Implementation found: [specific gap]."
 cd ..
 ```
@@ -182,7 +182,7 @@ Missing interaction states, unclear component behavior, unspecified error flows:
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: UX spec missing [what]" \
-  --label "type:amendment,pipeline:needs-ux-design,blocker" \
+  --label "type:amendment,pipeline:design,blocker" \
   --body "Blocks #[task-issue]. Implementation found: [specific gap]."
 cd ..
 ```
@@ -194,7 +194,7 @@ Ambiguous acceptance criteria, contradictory requirements, missing edge cases:
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: PRD-NNN [specific gap]" \
-  --label "type:amendment,pipeline:needs-product-review,blocker" \
+  --label "type:amendment,pipeline:review,blocker" \
   --body "Blocks #[task-issue]. Implementation found: [specific gap]."
 cd ..
 ```

@@ -96,8 +96,10 @@ Example: `acme-prod-db-primary`, `acme-staging-api-app`
 
 ## Pipeline Context
 
-DevOps tasks follow the same pipeline as other implementation tasks
-(`ready-for-dev` → `in-progress` → `needs-testing` → review pipeline → `done`).
+DevOps tasks follow the same `pipeline:implement` phase as other
+implementation tasks. The coordinator dispatches DevOps work and manages
+the review cycle — same pattern as all other tasks.
+
 DevOps work is typically triggered during initial repo provisioning or when
 architecture identifies infrastructure needs.
 
@@ -108,23 +110,16 @@ coordination can proceed.
 ## Process
 
 1. Read the task issue and architecture doc for infrastructure requirements
-2. Read `repos.yaml` (from orchestrator) for service topology and dependencies
-
-### Git Workflow
-
-```bash
-git checkout main && git pull origin main
-git checkout -b feat/[issue-number]-[short-description]
-```
-
-3. Design CI/CD pipeline for the repo's tech stack
-4. Create/update Dockerfiles with best practices
-5. Configure CI workflow (`.github/workflows/ci.yml`)
-6. Define infrastructure resources (Terraform/Bicep if applicable)
-7. Set up monitoring and health checks
-8. Document operational procedures
-9. Commit, push, create PR: `gh pr create --title "feat: [title]"`
-10. Advance issue label: `--remove-label "pipeline:in-progress" --add-label "pipeline:needs-testing"`
+2. Read `repos.yaml` for service topology and dependencies
+3. Create feature branch: `feat/[issue-number]-[short-description]`
+4. Design CI/CD pipeline for the repo's tech stack
+5. Create/update Dockerfiles with best practices
+6. Configure CI workflow (`.github/workflows/ci.yml`)
+7. Define infrastructure resources (Terraform/Bicep if applicable)
+8. Set up monitoring and health checks
+9. Document operational procedures
+10. Ensure CI passes locally, create PR (NOT draft)
+11. Update task issue: `**Status:** implementation complete, PR #NNN ready for review`
 
 ## Escalation (Backward Transitions)
 
@@ -139,7 +134,7 @@ infrastructure requirements:
 ```bash
 cd [DOCS_REPO]
 gh issue create --title "Amendment: architecture missing [what]" \
-  --label "type:amendment,pipeline:needs-architecture,blocker" \
+  --label "type:amendment,pipeline:design,blocker" \
   --body "Blocks #[task-issue]. DevOps needs: [specific infrastructure detail]."
 cd ..
 ```
