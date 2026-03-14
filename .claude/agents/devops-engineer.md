@@ -53,7 +53,9 @@ trigger → checkout → install → lint → build → test → security-scan �
 - Test against actual database (Testcontainers or CI service containers)
 - Coverage reporting with diff coverage on PRs
 - Artifact retention: build outputs, test reports, coverage reports
-- Branch protection: require CI pass + review before merge to main
+- Branch protection: require CI status checks to pass before merge
+  (review enforcement is pipeline-process-based, not GitHub-approval-based
+  — see git-conventions.md)
 
 ### CD Best Practices
 - Environment promotion: staging → production (never skip staging)
