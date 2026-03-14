@@ -199,6 +199,7 @@ stop for stakeholder input.
 ### Utility
 - `/orient` — situational report (project state, issues, PRs, recommendations)
 - `/initialise-workspace` — bootstrap a new project workspace (global skill)
+- `/upgrade-workspace` — upgrade tooling to latest orchestrator template (preserves project content)
 
 ## Available Agents
 

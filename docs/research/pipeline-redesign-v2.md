@@ -1876,6 +1876,143 @@ the task. This is a safety net, not the primary provisioning path.
 
 ---
 
+## Workspace Upgrade (`/upgrade-workspace`)
+
+When the orchestrator template evolves (new agents, updated pipeline
+rules, new skills, bug fixes), existing project workspaces need to
+pick up those changes without losing project content. The
+`/upgrade-workspace` skill handles this.
+
+### Principle
+
+The workspace has two categories of content:
+
+- **Tooling** — agents, skills, rules, hooks, pipeline definitions,
+  templates, conventions, scripts. These come from the orchestrator
+  template and can be replaced wholesale.
+- **Project content** — PRDs, designs, roadmaps, architecture docs,
+  STATUS.md, repos.yaml, active-work, GitHub issues. These belong to
+  the project and must never be touched.
+
+Upgrade replaces tooling. It does not touch project content.
+
+### What Gets Replaced
+
+**Workspace root (moved from docs repo during init):**
+
+| Path | Action |
+|------|--------|
+| `.claude/` (entire directory) | Replace wholesale from template |
+| `CLAUDE.md` | Regenerate from template with project values |
+
+**Inside docs repo:**
+
+| Path | Action |
+|------|--------|
+| `scripts/` | Replace from template |
+| `.github/` | Replace from template + sync labels to GitHub |
+| `GUIDE.md` | Replace from template |
+| `README.md` | Regenerate from template with project values |
+| `docs/conventions/*.md` | Replace from template |
+| `docs/prd/templates/` | Replace from template |
+| `docs/planning/templates/` | Replace from template |
+| `docs/discovery/templates/` | Replace from template |
+| `docs/architecture/decisions/templates/` | Replace from template |
+| `docs/research/` | Replace from template |
+| `templates/` (issue/epic templates) | Replace from template |
+
+### What Is NOT Touched
+
+| Path | Why |
+|------|-----|
+| `STATUS.md` | Project state — current phase, blockers, progress |
+| `repos.yaml` | Project repo registry — has component repos added during design |
+| `active-work/` | Session logs and epic progress |
+| `docs/prd/*.md` (not templates/) | Project PRDs |
+| `docs/discovery/*.md` (not templates/) | Project discovery docs |
+| `docs/planning/roadmap.md` | Project roadmap |
+| `docs/architecture/` (not templates/) | Project architecture docs and ADRs |
+| `docs/design/` | Project UX specs, API contracts, schemas |
+| Component repos | Completely untouched — different git repos |
+| GitHub issues and PRs | Untouched — live on GitHub |
+
+### How It Works
+
+The upgrade follows the same substitution process as
+`/initialise-workspace` — it takes the new template, applies project
+values, and writes the result. The only values needed are:
+
+- **Project name** — read from `repos.yaml` or the docs repo directory name
+- **Docs repo name** — read from the workspace directory structure
+- **GitHub account** — read from `gh auth status`
+
+These are the same values init used. No user input required.
+
+### Process
+
+1. **Detect workspace** — verify this is a valid workspace (has
+   `CLAUDE.md`, `.claude/`, and a docs repo with `repos.yaml`)
+2. **Extract project values** — read project name and docs repo name
+   from repos.yaml, read GitHub account from `gh auth status`
+3. **Fetch latest template** — clone the template repo to a temp dir:
+   ```bash
+   gh repo clone themachinagod/andgasm-claude-orchestration-project /tmp/upgrade-template -- --depth 1
+   ```
+4. **Replace workspace tooling** — copy `.claude/` and regenerate
+   `CLAUDE.md` from template with project value substitutions
+5. **Replace docs repo tooling** — copy scripts, .github, GUIDE.md,
+   conventions, templates, research. Regenerate README.md.
+6. **Sync labels** — apply labels from `.github/labels.yml` to the
+   docs repo on GitHub (additive — does not remove project-created
+   labels like `initiative:*`, only updates template-defined labels)
+7. **Clean up** — remove temp dir
+8. **Commit and push** — commit changes to docs repo main branch
+9. **Report** — list what was updated, flag any state concerns
+
+### Label Sync Strategy
+
+The label sync is **additive with updates**:
+
+- Labels in the new template that don't exist → create them
+- Labels in the new template that already exist → update color/description
+- Labels NOT in the template (project-created, like `initiative:auth`)
+  → leave untouched
+- Labels in the OLD template but removed in the NEW template (like
+  `pipeline:verify`) → flag to user for manual removal (don't auto-delete
+  labels that might be on existing issues)
+
+### Pipeline State Compatibility
+
+Upgrade is safe to run at any pipeline stage. New agents and rules
+take effect on the next orchestrator cycle — they don't retroactively
+affect in-flight work. Specific considerations:
+
+- **New agents** (e.g., `security-reviewer.md`) — available immediately
+  but only invoked when the pipeline reaches a phase that uses them
+- **Updated state markers** (`**Status:**` format) — old-format comments
+  on existing issues are history. The orchestrator reads the latest
+  comment, so new comments going forward use the new format.
+- **Removed labels** (e.g., `pipeline:verify`) — if any issues have
+  the old label, the upgrade skill flags this for manual review
+- **New pipeline rules** — take effect immediately. Agents operating
+  under old rules (in-flight work) will naturally transition to new
+  rules on the next cycle.
+
+### Where It Lives
+
+The skill lives at `.claude/skills/upgrade-workspace/SKILL.md` — part
+of the tooling that ships with the template. After the first upgrade,
+subsequent upgrades can use `/upgrade-workspace` directly.
+
+For the first upgrade of a pre-upgrade workspace, the user manually
+copies the skill file into `.claude/skills/upgrade-workspace/` or
+instructs Claude to perform the upgrade steps directly.
+
+This is NOT a global skill (unlike `/initialise-workspace`). It
+operates on an existing workspace, which already has `.claude/`.
+
+---
+
 ## Known Gap: Design Phase Specialist Review Coverage
 
 > Observed during testing: the design phase coordinator tends to
@@ -1992,6 +2129,10 @@ the task. This is a safety net, not the primary provisioning path.
 | Epic completion includes final integration check | Coordinator verifies all tasks merged, all repos build and pass tests together. Creates fix tasks if integration issues found. |
 | Security-reviewer agent needed for implementation phase | OWASP, injection, auth, secrets, input validation. Every PR touching auth/user input/external integrations should include security review. |
 | Design phase specialist review gap identified | Coordinator defaults to architect-only review. Needs fix: coordinator must map epic scope to specialist involvement for both design production and PR review. |
+| `/upgrade-workspace` skill for existing workspaces | Template evolves; existing workspaces need to pick up changes without losing project content. Replaces tooling, regenerates mixed files with project values, syncs labels. Same substitution process as init. |
+| Upgrade is NOT a global skill | Unlike `/initialise-workspace`, it operates on an existing workspace that already has `.claude/`. Ships with the template. First upgrade may need manual skill file placement. |
+| Label sync is additive, not destructive | Upgrade creates/updates template labels but does not delete project-created labels (like `initiative:*`). Removed template labels are flagged for manual review. |
+| Upgrade is safe at any pipeline stage | New agents/rules take effect on next cycle. Old-format comments are history. In-flight work transitions naturally. |
 | Structured state markers (`**Status:**`) for all comment-based state transitions | Free-text comment parsing is fragile. Structured prefix makes detection reliable while keeping comments human-readable. Applied to ALL phases. |
 | CI check before ANY PR merge (all phases) | Prevents merging broken PRs. Coordinator/orchestrator runs `gh pr checks` before every merge — review, decompose, design, implement. Universal rule. |
 | Per-task coordinator dispatch in implement phase (not per-epic) | Matches the design phase pattern (one coordinator invocation per work item). Keeps coordinator context focused. Orchestrator manages higher-level coordination (task readiness, epic completion). |
