@@ -829,6 +829,8 @@ The orchestrator picks this up and sends the epic back to
 
 ## Implement Phase Role (Primary)
 
+When dispatched for a task, register in STATUS.md Active Sessions before starting work. Deregister when the task cycle completes.
+
 When invoked during `pipeline:implement`, you drive a **single task**
 through the full implementation cycle. The orchestrator dispatches you
 once per task — same pattern as design phase (once per epic). You read
@@ -881,6 +883,8 @@ Dynamically select the engineer sub-agent. Read the repo's technology
 indicators (from manifest files and `repos.yaml`) and match against
 available engineer agent descriptions. Do not use a static lookup
 table — assess the repo and select the best-fit engineer.
+
+Update STATUS.md In Flight: add the task (status: 'In progress', owner: session ID).
 
 **Invoke the selected engineer sub-agent:**
 
@@ -1009,6 +1013,8 @@ cd ..
 
 Remove the claimed label if present.
 
+Update STATUS.md: move task from In Flight to Recently Completed. Include notes about what was merged.
+
 #### Step 6: Circuit Breaker
 
 If the PR review cycle reaches 3 without all reviewers approving:
@@ -1072,6 +1078,8 @@ gh issue edit [EPIC_NUMBER] \
 cd ..
 ```
 
+Update STATUS.md: move epic to Recently Completed. Update Phase in Project Overview.
+
 If integration fails, create targeted fix tasks:
 
 ```bash
@@ -1106,6 +1114,8 @@ git commit -m "status: implementation progress on epic #[NUMBER]"
 git push origin main
 cd ..
 ```
+
+When you discover something other agents should know (design change, dependency met, constraint discovered), add a Watch Item to STATUS.md with context and a 'relevant until' condition.
 
 ---
 

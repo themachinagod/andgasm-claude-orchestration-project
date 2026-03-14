@@ -280,6 +280,7 @@ implementations in your stack.
    - Any decisions made during implementation (with rationale)
 10. Update task issue comment: "implementation complete, PR #NNN
     ready for review"
+11. **Update STATUS.md** — update In Flight status to 'PR created, ready for review'
 
 **What you do NOT do:**
 - Do not merge your own PR (coordinator merges on approval)
