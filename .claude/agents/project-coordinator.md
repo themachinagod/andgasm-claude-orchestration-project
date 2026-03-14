@@ -123,23 +123,31 @@ Expected output from architect:
 - Complexity flags on proposed groupings
 - Structured content for roadmap sections
 
-#### Step 3: Collate Roadmap
+#### Step 3: Produce Roadmap
 
-Take the PM and architect outputs and **assemble** them into a roadmap
-document using the template at `docs/planning/templates/roadmap-template.md`.
+The roadmap is a **process artifact** — it defines what epics exist, in
+what order, with what dependencies. This is your document to own and
+produce. You are not writing design content; you are structuring the
+project plan from PM and architect inputs.
 
-You are an **editor** here, not an author:
-1. Slot PM content into the product sections of the template
-2. Slot architect content into the technical sections
-3. Merge their cross-cutting concerns into a unified section
-4. Ensure every PRD appears in at least one epic (flag back to PM if not)
-5. Ensure the dependency graph is consistent (flag back to architect if not)
-6. Resolve formatting, numbering, and cross-reference consistency
-7. Do NOT add analysis, opinions, or content that neither sub-agent produced
+Build the roadmap using the template at
+`docs/planning/templates/roadmap-template.md`:
+
+1. Define initiatives from PM's thematic groupings
+2. Define foundational epics (Level 0) — combine PM's foundational
+   product epics and architect's foundational design epics
+3. Define product epics from PM's groupings, with source PRDs,
+   scope summaries, and acceptance criteria
+4. Define infrastructure/technical epics from architect's analysis
+5. Establish dependency order using architect's dependency constraints
+   and PM's priority rationale
+6. Document cross-cutting concerns from both PM and architect
+7. Ensure every PRD appears in at least one epic — flag back to PM if not
+8. Ensure the dependency graph is consistent — flag back to architect if not
 
 If there are gaps or conflicts between PM and architect outputs:
 - Route the specific conflict back to both sub-agents for resolution
-- Do not resolve it yourself
+- Do not invent technical analysis or product rationale yourself
 
 #### Step 4: Create Branch and PR
 
@@ -379,11 +387,17 @@ cd ..
 When invoked during `pipeline:design`, you drive the design process.
 You assess the epic, assemble the specialist team, delegate all design
 production to sub-agents, manage the PR review cycle, and decompose
-into implementation tasks.
+the approved design into implementation tasks.
 
-**You do not produce any design content.** The architect produces the
-architecture doc. Specialists produce their domain-specific sections.
-You collate, manage process, and handle git mechanics.
+**You do not produce any design or technical content.** The architect
+produces the architecture doc. Specialists produce their domain-specific
+sections. You collate their outputs (editor, not author), manage process,
+and handle git mechanics.
+
+**You do own task decomposition** — breaking designs into implementation
+work items is project management, not design. You invoke engineer agents
+for technical advice on task boundaries, then assemble and create the
+task list.
 
 ### Process
 
@@ -648,17 +662,40 @@ cd [DOCS_REPO]
 gh pr merge [PR_NUMBER] --squash --delete-branch
 ```
 
-Delegate task decomposition to the `architect` sub-agent:
+Task decomposition is **your responsibility** — it is project management,
+not design work. However, you need technical input on where the natural
+task boundaries are in each stack. You decide *that* we need tasks and
+*manage* their creation; the technical agents advise on *where the seams
+are* in their domain.
+
+**Invoke the relevant engineer sub-agents** (based on which repos/stacks
+the design touches — from `repos.yaml`). Invoke in parallel where
+sub-agents cover independent repos:
+
+For each relevant engineer (engineer-dotnet, engineer-python,
+engineer-angular, engineer-typescript, database-engineer, devops-engineer):
 
 - "The design for EPIC-NNN is approved and merged."
-- "Read the merged design in `docs/architecture/[epic-name]/`."
-- "Decompose into implementation tasks. For each task, provide:
-  title, scope description, acceptance criteria, quality gates,
-  and which component repo it belongs to (from repos.yaml)."
-- "Ensure tasks are ordered by dependency — leaf tasks first."
+- "Read the merged design in `[DOCS_REPO]/docs/architecture/[epic-name]/`."
+- "Read the existing codebase in [repo-path] (from repos.yaml)."
+- "Advise on task boundaries for your stack: what are the natural
+  implementation units? What should be done first (dependencies)?
+  For each proposed task, provide: title, scope description,
+  acceptance criteria, and quality gates."
+- "Return your proposed tasks for [repo-name]."
 
-Take the architect's task list and create issues in the appropriate
-component repos:
+If the epic is purely architectural (no component repos yet, or
+conventions/patterns only), invoke the `architect` instead:
+
+- "The design for EPIC-NNN is approved and merged."
+- "Advise on task boundaries: what are the implementation units?"
+
+Take the engineer/architect task proposals and **assemble the final
+task list**. This is your job — you sequence across repos, resolve
+cross-repo dependencies, ensure consistent sizing, and create the
+issues:
+
+Create task issues in the appropriate component repos:
 
 ```bash
 gh issue create \
