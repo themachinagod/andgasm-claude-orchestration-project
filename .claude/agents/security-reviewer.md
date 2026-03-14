@@ -21,6 +21,14 @@ When reviewing implementations for security:
 - Flag any dependency that is unmaintained or has not had a release
   in over 12 months if it handles security-sensitive operations
 
+## Design Phase Note
+
+Security-Reviewer does not participate in the Design phase. Security
+architectural decisions (auth model, encryption strategy, data
+classification, threat modelling) are the **Architect's** responsibility
+during design. Security-Reviewer validates these decisions are correctly
+implemented during the Implement phase review.
+
 ## Implement Phase Role
 
 When invoked during `pipeline:implement` by the project-coordinator, you

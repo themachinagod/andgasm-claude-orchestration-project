@@ -143,6 +143,24 @@ If **design/architecture** gaps found:
   cd ..
   ```
 
+### What You Look For (Implement Phase Checklist)
+
+- [ ] Every acceptance criterion from the task issue is implemented
+- [ ] Every acceptance criterion from the linked PRD is addressed
+- [ ] Implementation matches the intent of the design doc (not just
+      the letter — does it achieve what was designed?)
+- [ ] Edge cases mentioned in the PRD or design are handled
+- [ ] Non-functional requirements from the design are satisfied:
+  - [ ] Performance considerations addressed (if specified)
+  - [ ] Accessibility requirements met (if applicable)
+  - [ ] Quality gates from the design doc satisfied
+- [ ] No scope creep — implementation doesn't add unspecified features
+      that could introduce risk without PRD justification
+- [ ] Cross-cutting acceptance criteria are addressed (compliance,
+      data handling, audit logging — if specified in PRD/design)
+- [ ] Traceability chain is intact: task references design doc,
+      design references epic, epic references PRD
+
 ### What You Do NOT Do
 
 - Don't drive the process (coordinator does)
