@@ -5,36 +5,21 @@
   "hooks": {
     "SessionStart": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/on-session-start.sh",
-            "description": "Orient: read STATUS.md and report project state"
-          }
-        ]
+        "type": "command",
+        "command": ".claude/hooks/on-session-start.sh"
       }
     ],
     "TaskCompleted": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/on-task-complete.sh",
-            "description": "Checklist: verify state persistence before session ends"
-          }
-        ]
+        "type": "command",
+        "command": ".claude/hooks/on-task-complete.sh"
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ".claude/hooks/block-dangerous.sh",
-            "description": "Block destructive shell commands"
-          }
-        ]
+        "type": "command",
+        "command": ".claude/hooks/block-dangerous.sh"
       }
     ]
   }
