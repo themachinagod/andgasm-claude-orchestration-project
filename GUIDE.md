@@ -344,6 +344,55 @@ concurrent implementation, use multiple terminals instead.
 
 ---
 
+## Upgrading an Existing Workspace
+
+When the orchestrator template is updated with new agents, pipeline
+rules, or skills, upgrade your workspace to pick up the changes:
+
+```
+/upgrade-workspace
+```
+
+This replaces all tooling (agents, skills, rules, scripts, conventions,
+templates) while preserving all project content (PRDs, designs, roadmap,
+STATUS.md, repos.yaml, architecture docs).
+
+### What it does
+
+1. Fetches the latest orchestrator template from GitHub
+2. Replaces `.claude/` and regenerates `CLAUDE.md` with project values
+3. Replaces scripts, `.github/`, GUIDE.md, conventions, templates
+4. Syncs labels to the docs repo on GitHub
+5. Commits and pushes changes to the docs repo
+
+### What it preserves
+
+Everything that's project content — STATUS.md, repos.yaml, active-work,
+PRDs, discovery docs, roadmap, architecture docs, design docs, component
+repos, GitHub issues and PRs.
+
+### First-time upgrade
+
+If your workspace was created before `/upgrade-workspace` existed, the
+skill won't be available yet. Either:
+
+1. Manually copy the skill file into your workspace:
+   ```bash
+   mkdir -p .claude/skills/upgrade-workspace
+   # Copy SKILL.md from the template repo
+   ```
+2. Or tell Claude to perform the upgrade steps directly
+
+After the first upgrade, `/upgrade-workspace` will be available for
+subsequent upgrades.
+
+### Safe at any pipeline stage
+
+The upgrade takes effect immediately. New agents and rules will be
+used on the next orchestrator cycle without affecting in-flight work.
+
+---
+
 ## Later phases (not yet built)
 
 - **Deliver** — E2E testing, documentation, release coordination
