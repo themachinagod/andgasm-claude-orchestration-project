@@ -3,6 +3,8 @@ name: orchestrate
 description: >
   Pipeline orchestrator. Reads project state, determines the pipeline stage
   and sub-state for open issues, and dispatches the appropriate agent team.
+  Automatically bridges Discovery to Review by detecting unsubmitted PRDs
+  and creating the branch, PR, and issue without requiring /submit-prds.
   Handles review, decompose, and design stages. Designed to be called by
   ralph.sh for autonomous operation or interactively by the user.
 ---
@@ -39,10 +41,19 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
      --json number,title,labels,body \
      --jq '.[] | select(.labels[].name | startswith("pipeline:"))'
    ```
-4. If no pipeline issues exist:
-   - Report: "No open pipeline issues. Nothing to orchestrate."
-   - Update STATUS.md if needed
-   - `cd ..` and stop
+4. If no pipeline issues exist, check for unsubmitted PRDs:
+   ```bash
+   # Still inside [DOCS_REPO] from step 3
+   ls docs/prd/*.md 2>/dev/null | grep -v templates/
+   ```
+   - If PRD files exist (outside `templates/`): this is the Discovery → Review
+     transition. Run the submit-prds logic (see **Stage: Unsubmitted PRDs** below)
+     to create the branch, PR, and `pipeline:review` issue, then continue
+     orchestration with the newly created issue.
+   - If no PRD files exist either:
+     - Report: "No open pipeline issues and no PRDs to submit. Nothing to orchestrate."
+     - Update STATUS.md if needed
+     - `cd ..` and stop
 5. For each pipeline issue, read the comments to determine sub-state:
    ```bash
    gh issue view [NUMBER] --json comments --jq '.comments[-1].body'
@@ -58,6 +69,7 @@ The `[DOCS_REPO]` path is defined in `CLAUDE.md` under "Workspace Layout".
 
 Determine which pipeline stage to handle based on priority:
 
+0. Unsubmitted PRDs — detected in Orient, handled before any pipeline issues
 1. `pipeline:review` — review and facilitation cycle
 2. `pipeline:decompose` — PRDs → epics + roadmap
 3. `pipeline:design` — epic-level design + task decomposition
@@ -434,6 +446,128 @@ cd ..
 
 The roadmap will need updating and re-review. This is a safety valve,
 not a common path.
+
+---
+
+#### Stage: Unsubmitted PRDs (Discovery → Review bridge)
+
+This stage is detected in Orient (step 4) when there are no open pipeline
+issues but PRD files exist in `docs/prd/` (excluding `templates/`). This
+bridges the gap between manual Discovery and the automated pipeline —
+the orchestrator handles submission automatically so neither the user
+nor Ralph needs to run `/submit-prds` separately.
+
+**Step 1: Verify PRDs are ready**
+
+```bash
+cd [DOCS_REPO]
+git checkout main && git pull origin main
+```
+
+Check that PRD files exist and are committed (or at least present):
+```bash
+ls docs/prd/*.md 2>/dev/null | grep -v templates/
+```
+
+If there are uncommitted PRD files, stage and commit them first:
+```bash
+git add docs/prd/ docs/discovery/
+git status --porcelain docs/prd/ docs/discovery/
+```
+
+If nothing to commit and nothing already committed in `docs/prd/`
+(excluding templates), stop — there's genuinely nothing to submit.
+
+**Step 2: Determine submission number**
+
+```bash
+git branch -a | grep "prd-submission" || echo "No prior submissions"
+gh issue list --label "type:prd-review" --json number,title --state all
+```
+
+Use the next sequential number (e.g., `001`, `002`, etc.).
+
+**Step 3: Create branch, commit, push, PR, and issue**
+
+Follow the same mechanics as the `/submit-prds` skill:
+
+```bash
+git checkout -b docs/prd-submission-[NNN]
+git add docs/prd/ docs/discovery/
+git commit -m "docs: submit PRDs for review
+
+Submits the following PRDs for pipeline review:
+$(ls docs/prd/*.md 2>/dev/null | grep -v templates/ | sed 's/docs\/prd\//- /')"
+git push origin docs/prd-submission-[NNN]
+```
+
+Create the PR:
+```bash
+gh pr create \
+  --title "docs: PRD submission [NNN] for review" \
+  --body "## PRD Submission
+
+### PRDs submitted
+$(ls docs/prd/*.md 2>/dev/null | grep -v templates/ | sed 's/^/- /')
+
+### Discovery docs
+$(ls docs/discovery/*.md 2>/dev/null | grep -v templates | sed 's/^/- /' || echo '- (none)')
+
+### Process
+This PR will be reviewed by the review team (product-manager + architect).
+Review findings will appear as PR comments.
+The stakeholder facilitator will walk through any items needing input.
+
+Closes #[ISSUE_NUMBER]"
+```
+
+Create the issue:
+```bash
+gh issue create \
+  --title "PRD Review: submission [NNN]" \
+  --label "type:prd-review,pipeline:review" \
+  --body "## PRD Review Cycle
+
+**Submission:** [NNN]
+**PR:** #[PR_NUMBER]
+**PRDs:**
+$(ls docs/prd/*.md 2>/dev/null | grep -v templates/ | sed 's/^/- /')
+
+### Review State
+Awaiting first review by review team.
+
+### Process
+1. Review team analyses PRDs (autonomous)
+2. Stakeholder facilitator walks through findings (interactive)
+3. Review team re-reviews until clean
+4. Merge PR, advance to pipeline:decompose"
+```
+
+Link the PR to the issue (update PR body with actual issue number).
+
+**Step 4: Update STATUS.md and return to main**
+
+```bash
+git checkout main
+```
+
+Update `[DOCS_REPO]/STATUS.md`:
+- Set phase to "Review"
+- Add the issue to the Active Work table
+- Note the PR number
+
+```bash
+git add STATUS.md
+git commit -m "status: PRDs submitted for review — issue #[NUMBER]"
+git push origin main
+cd ..
+```
+
+**Step 5: Continue orchestration**
+
+The `pipeline:review` issue now exists. Continue to Phase 2 (Decide)
+and handle it as a normal review — do NOT stop and require another
+orchestrate cycle.
 
 ---
 
