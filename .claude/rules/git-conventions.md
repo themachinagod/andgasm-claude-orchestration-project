@@ -40,6 +40,61 @@ Format: `<type>/<issue-number>-<short-description>`
 - Keep branches short-lived (days, not weeks)
 - Delete after merge
 
+## Git Worktrees (Concurrent Implementation)
+
+When multiple sessions work on different tasks in the **same component
+repo**, each session MUST use a git worktree to avoid filesystem and
+git index collisions. Two agents sharing the same working directory and
+git index is a race condition — even on different branches.
+
+### What Worktrees Provide
+
+A git worktree is a separate working directory with its own HEAD, index,
+and staging area, while sharing the same `.git` object store. This means:
+- Each agent has its own files — no cross-contamination from `git checkout`
+- Each agent has its own staging area — no interleaved `git add`
+- A branch can only be checked out in one worktree at a time (git enforces)
+- Commits, pushes, and fetches work independently per worktree
+
+### When Worktrees Are Used
+
+The **orchestrator** is responsible for dispatching the coordinator in a
+worktree. It uses `isolation: "worktree"` on the Agent tool call when
+dispatching a `project-coordinator` for `pipeline:implement` tasks in
+component repos. The coordinator and all its sub-agents (engineer,
+reviewers) inherit the worktree — they operate in the isolated directory
+without any additional configuration.
+
+### What Agents Need to Know
+
+- **Git commands work identically in a worktree.** No special flags needed.
+  `git checkout -b`, `git add`, `git commit`, `git push` — all normal.
+- **Your working directory may be a temporary path** (e.g.,
+  `/tmp/worktree-feat-auth/`) rather than the canonical repo path. This
+  is expected. Use the directory you are given.
+- **`gh` commands with `--repo` flags work from any directory.** Issue
+  updates, PR creation, CI checks — all use `--repo [owner/repo]` and
+  are location-independent.
+- **Reading docs repo content uses absolute workspace paths.** The docs
+  repo is at its canonical path (`[DOCS_REPO]/`) regardless of which
+  worktree you are in. Use absolute paths to read design docs, PRDs,
+  and repos.yaml.
+- **STATUS.md updates go to the canonical docs repo** (not a worktree).
+  `cd [DOCS_REPO]` for STATUS.md updates — this is always the real repo
+  on `main`.
+- **Rebase before PR** still applies: `git fetch origin && git rebase
+  origin/main` before pushing, same as always.
+
+### When Worktrees Are NOT Used
+
+- **Docs repo operations** (decompose, design phases) — these use branch
+  + PR on the canonical docs repo. Only one session works a given docs
+  repo issue at a time (claimed label), so no filesystem collision risk.
+- **Single-session component work** — if only one session is active on a
+  component repo, the canonical directory is fine. Worktrees add value
+  only when concurrent access exists. The orchestrator uses worktrees
+  for all implement dispatches as a safe default.
+
 ## What Goes Through Branch + PR
 
 All content changes in the docs repo:

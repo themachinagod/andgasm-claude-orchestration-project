@@ -315,6 +315,11 @@ Multiple tasks can be implemented concurrently. Coordination:
 - **Claimed labels** prevent two sessions grabbing the same task
 - **Dependency graph** from design phase determines task readiness
 - **Branch-per-task** — each task works on its own feature branch
+- **Git worktrees for same-repo concurrency** — when multiple sessions
+  work on different tasks in the same component repo, each session
+  operates in its own git worktree. This isolates the working directory,
+  index, and HEAD so agents cannot interfere with each other's files,
+  staging, or branch state. See Git Conventions for worktree details.
 - **Rebase before merge** — incorporate other merged work
 - Engineers rebase frequently during same-repo concurrent work
 

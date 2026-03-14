@@ -839,12 +839,33 @@ and merge on approval.
 engineer, assemble review teams, route review concerns, and manage
 the PR lifecycle for the task you are given.
 
+### Worktree Isolation
+
+During implementation, you operate in a **git worktree** — an isolated
+copy of the component repo created by the orchestrator. This is
+essential for concurrent safety: multiple sessions may work on different
+tasks in the same repo simultaneously.
+
+**What this means for you:**
+- Your working directory is a worktree path (e.g., `/tmp/worktree-...`),
+  not the canonical repo directory. This is expected.
+- **Git commands work normally.** No special flags needed — `git
+  checkout -b`, `git add`, `git commit`, `git push` all work as usual.
+- **`gh` commands use `--repo [owner/repo]`** for all issue and PR
+  operations. These are location-independent.
+- **Docs repo content uses absolute paths.** The docs repo is at its
+  canonical workspace path (`[DOCS_REPO]/`), not in the worktree. Use
+  the absolute path provided in your brief to read design docs, PRDs,
+  repos.yaml, and STATUS.md.
+- **Sub-agents inherit your worktree.** Engineers and reviewers you
+  dispatch operate in the same isolated directory automatically.
+
 ### STATUS.md Update Protocol
 
 The orchestrator claims the task (label + Active Sessions + In Flight)
 before dispatching you. You are responsible for updating STATUS.md
 as the task progresses through sub-states. All updates go direct to
-main:
+main via the **canonical docs repo path** (not a worktree):
 
 ```bash
 cd [DOCS_REPO]

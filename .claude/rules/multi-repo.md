@@ -32,6 +32,13 @@ Git commands (checkout, commit, push, PR) must run from within the target
 repo directory. Use `cd [DOCS_REPO]` or `cd [component-repo]` for git
 operations, then `cd ..` to return to workspace root.
 
+During **concurrent implementation**, agents operate in git worktrees
+(isolated copies of component repos). In this case, the working directory
+is a worktree path rather than the canonical repo path. Git commands
+work identically. `gh` commands use `--repo [owner/repo]` and are
+location-independent. Docs repo access always uses the canonical
+absolute path.
+
 ### Issue Operations
 GitHub Issues live in the repo they relate to:
 - Documentation/coordination issues → docs repo
