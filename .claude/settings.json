@@ -5,21 +5,33 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "command",
-        "command": ".claude/hooks/on-session-start.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/on-session-start.sh"
+          }
+        ]
       }
     ],
     "TaskCompleted": [
       {
-        "type": "command",
-        "command": ".claude/hooks/on-task-complete.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/on-task-complete.sh"
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "type": "command",
-        "command": ".claude/hooks/block-dangerous.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/block-dangerous.sh"
+          }
+        ]
       }
     ]
   }
